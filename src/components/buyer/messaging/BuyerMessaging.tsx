@@ -105,10 +105,17 @@ const BuyerMessaging: React.FC<BuyerMessagingProps> = ({ seller, isOpen, onClose
       // Use seller ID directly, assuming it's already a valid reference
       const sellerId = seller.id;
 
+      // Unsubscribe from any existing channel first
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+      }
+
+      // Create a unique channel ID to avoid conflicts
+      const channelId = `buyer-messages-${currentUserId}-${sellerId}-${Date.now()}`;
+
       // Create a channel for real-time updates - listening for ALL messages in the conversation
-      // This improved approach catches both incoming and outgoing messages
       const channel = supabase
-        .channel('buyer-messages')
+        .channel(channelId)
         .on(
           'postgres_changes',
           {
@@ -118,10 +125,11 @@ const BuyerMessaging: React.FC<BuyerMessagingProps> = ({ seller, isOpen, onClose
             filter: `or(and(sender_id=eq.${currentUserId},recipient_id=eq.${sellerId}),and(sender_id=eq.${sellerId},recipient_id=eq.${currentUserId}))`,
           },
           (payload) => {
+            console.log('Received new message:', payload.new);
             // Process any new message in this conversation
             const newMessage = payload.new as Message;
             
-            // Check if the message already exists in our state
+            // Check if the message already exists in our state by ID
             const messageExists = messages.some((msg) => msg.id === newMessage.id);
             if (!messageExists) {
               setMessages((prevMessages) => [...prevMessages, newMessage]);
@@ -130,10 +138,15 @@ const BuyerMessaging: React.FC<BuyerMessagingProps> = ({ seller, isOpen, onClose
               if (newMessage.recipient_id === currentUserId) {
                 markMessageAsRead(newMessage.id);
               }
+              
+              // Scroll to bottom to show the new message
+              setTimeout(() => scrollToBottom(), 100);
             }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log(`Subscription status for buyer messages: ${status}`);
+        });
 
       subscriptionRef.current = channel;
     } catch (error) {
@@ -225,29 +238,59 @@ const BuyerMessaging: React.FC<BuyerMessagingProps> = ({ seller, isOpen, onClose
         imageUrl = await uploadImage(selectedImage);
       }
       
+      // Create new message object with a temporary ID
+      const newMessageId = uuidv4();
+      const timestamp = new Date().toISOString();
       const newMessage = {
+        id: newMessageId,
         sender_id: userId,
         recipient_id: sellerId,
         message_content: message.trim(),
         image_url: imageUrl,
-        read: false
+        read: false,
+        created_at: timestamp
       };
       
-      const { error } = await supabase
-        .from('messages')
-        .insert(newMessage);
+      // Optimistically add the message to the UI immediately
+      setMessages(prevMessages => [...prevMessages, newMessage as Message]);
       
-      if (error) {
-        console.error('Send error details:', error);
-        throw error;
-      }
-      
+      // Clear input fields
       setMessage('');
       setSelectedImage(null);
       setPreviewUrl(null);
       
-      // The message will appear via the subscription rather than adding it manually
-      // This ensures consistent behavior between both parties
+      // Then send to the server
+      const { error, data } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: userId,
+          recipient_id: sellerId,
+          message_content: message.trim(),
+          image_url: imageUrl,
+          read: false
+        })
+        .select();
+      
+      if (error) {
+        console.error('Send error details:', error);
+        // If there was an error, we could remove the optimistic message
+        // setMessages(prevMessages => prevMessages.filter(msg => msg.id !== newMessageId));
+        throw error;
+      }
+      
+      // The subscription would normally handle this, but just to be safe
+      // we'll ensure the message with the correct DB ID appears in the list
+      if (data && data[0]) {
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === newMessageId ? data[0] as Message : msg
+          )
+        );
+      }
+      
+      // Scroll to bottom to show new message
+      setTimeout(() => scrollToBottom(), 100);
+      
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
@@ -515,31 +558,11 @@ const BuyerMessaging: React.FC<BuyerMessagingProps> = ({ seller, isOpen, onClose
                         <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.message_content}</p>
                       )}
                       <p className="text-xs mt-1 opacity-70">{formatMessageTime(msg.created_at)}</p>
-                      
-                      {/* Support for interactive buttons within messages */}
-                      {msg.message_content.includes('Add to Cart') && !isSentByMe && (
-                        <Button 
-                          variant="secondary" 
-                          className="mt-3 w-full bg-white hover:bg-gray-50 text-purple-600 font-medium py-1 h-8"
-                          onClick={() => toast.success('Item added to cart!')}
-                        >
-                          Add to Cart
-                        </Button>
-                      )}
-                      
-                      {msg.message_content.includes('Done') && !isSentByMe && (
-                        <Button 
-                          className="mt-3 ml-auto bg-purple-600 hover:bg-purple-700 text-white font-medium py-1 h-8"
-                          onClick={() => toast.success('Order completed!')}
-                        >
-                          Done
-                        </Button>
-                      )}
                     </div>
                     {isSentByMe && (
-                      <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarFallback className="bg-purple-500 text-white">You</AvatarFallback>
-                      </Avatar>
+                      <div className="rounded-full bg-purple-500 text-white p-1 h-8 w-8 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-medium">You</span>
+                      </div>
                     )}
                   </div>
                 );

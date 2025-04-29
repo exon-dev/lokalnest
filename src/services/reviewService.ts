@@ -99,16 +99,17 @@ async function createNewReviewNotification(
         : `negative ${rating}-star`;
     
     // Use the RPC function to create notification (respects user preferences)
-    const { data, error } = await (supabase.rpc as any)('create_user_notification', {
+    // Fix: Changed p_notification_type from 'new_review' to 'review' to match the column name in notification_preferences
+    const { data, error } = await (supabase.rpc as any)('create_notification_if_enabled', {
       p_user_id: sellerId,
-      p_type: 'new_review',
+      p_notification_type: 'review',  // This matches the 'review_notifications' column in your preferences
       p_title: `New ${ratingText} Review`,
       p_message: `A customer left a ${ratingText} review for your product "${productName}".`,
       p_data: JSON.stringify({
         review_id: reviewId,
-        product_id: productId
-      }),
-      p_preference_key: 'review_notifications'
+        product_id: productId,
+        rating: rating
+      })
     });
 
     if (error) {

@@ -105,6 +105,7 @@ const SellerDashboard = () => {
     if (path === 'orders') return 'orders';
     if (path === 'promotions') return 'promotions';
     if (path === 'inventory') return 'inventory';
+    if (path === 'messages') return 'messages';
     if (path === 'customers') return 'customers';
     if (path === 'reviews') return 'reviews';
     if (path === 'settings') return 'settings';
@@ -147,7 +148,7 @@ const SellerDashboard = () => {
             {/* Content Area */}
             <div className="col-span-1 lg:col-span-9">
               <Tabs value={getActiveTab()} className="w-full" onValueChange={handleTabChange}>
-                <TabsList className="w-full mb-6 overflow-x-auto flex sm:grid sm:grid-cols-8">
+                <TabsList className="w-full mb-6 overflow-x-auto flex sm:grid sm:grid-cols-9">
                   <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
                   <TabsTrigger 
                     value="products" 
@@ -169,6 +170,12 @@ const SellerDashboard = () => {
                     disabled={!user.verified}
                   >
                     Orders {!user.verified && <span className="ml-1 text-xs">🔒</span>}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="messages" 
+                    className="flex-1"
+                  >
+                    Messages
                   </TabsTrigger>
                   <TabsTrigger 
                     value="customers" 
@@ -211,6 +218,10 @@ const SellerDashboard = () => {
                 </TabsContent>
                 
                 <TabsContent value="customers">
+                  <Outlet />
+                </TabsContent>
+
+                <TabsContent value="messages">
                   <Outlet />
                 </TabsContent>
                 

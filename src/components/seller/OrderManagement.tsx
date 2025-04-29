@@ -542,33 +542,37 @@ const OrderManagement = () => {
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             
-                            {/* Always show status change options regardless of current status */}
-                            <DropdownMenuItem onClick={() => updatePaymentStatus(order.id, 'approved')}>
-                              <CreditCard className="mr-2 h-4 w-4" />
-                              {order.status === 'approved' ? 'Payment Already Approved' : 'Approve Payment'}
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'processing')}>
-                              <Tag className="mr-2 h-4 w-4" />
-                              Mark as Processing
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'shipped')}>
-                              <Truck className="mr-2 h-4 w-4" />
-                              Mark as Shipped
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'delivered')}>
-                              <ClipboardCheck className="mr-2 h-4 w-4" />
-                              Mark as Delivered{order.payment_method?.toLowerCase() === 'cash on delivery' && ' (Will update COD payment)'}
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'cancelled')}>
-                              <X className="mr-2 h-4 w-4" />
-                              Mark as Cancelled
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuSeparator />
+                            {/* Only show status change options if the order is not cancelled */}
+                            {order.status !== 'cancelled' ? (
+                              <>
+                                <DropdownMenuItem onClick={() => updatePaymentStatus(order.id, 'approved')}>
+                                  <CreditCard className="mr-2 h-4 w-4" />
+                                  {order.status === 'approved' ? 'Payment Already Approved' : 'Approve Payment'}
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'processing')}>
+                                  <Tag className="mr-2 h-4 w-4" />
+                                  Mark as Processing
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'shipped')}>
+                                  <Truck className="mr-2 h-4 w-4" />
+                                  Mark as Shipped
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'delivered')}>
+                                  <ClipboardCheck className="mr-2 h-4 w-4" />
+                                  Mark as Delivered{order.payment_method?.toLowerCase() === 'cash on delivery' && ' (Will update COD payment)'}
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'cancelled')}>
+                                  <X className="mr-2 h-4 w-4" />
+                                  Mark as Cancelled
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuSeparator />
+                              </>
+                            ) : null}
                             
                             <DropdownMenuItem onClick={() => openOrderDetails(order)}>
                               <Package className="mr-2 h-4 w-4" />

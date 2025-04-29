@@ -28,6 +28,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import { ThemeProvider } from './components/theme/ThemeProvider';
 import Profile from './pages/Profile';
 import InventoryManagementNew from './components/seller/InventoryManagementNew';
+import SellerMessagesDashboard from './pages/SellerMessagesDashboard';
 
 function App() {
   return (
@@ -49,6 +50,7 @@ function App() {
                 <Route path="products" element={<ProductManagement />} />
                 <Route path="inventory" element={<InventoryManagementNew />} />
                 <Route path="orders" element={<OrderManagement />} />
+                <Route path="messages" element={<SellerMessagesDashboard />} />
                 <Route path="customers" element={<CustomerManagement />} />
                 <Route path="promotions" element={<PromotionManagement />} />
                 <Route path="logistics" element={<LogisticsManagement />} />

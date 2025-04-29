@@ -17,13 +17,13 @@ const Footer = () => {
               Connecting you directly with local producers, farmers, and artisans to bring the freshest products to your table.
             </p>
             <div className="space-y-3">
-              <div className="flex items-start">
+              {/* <div className="flex items-start">
                 <MapPin className="h-5 w-5 text-muted-foreground mr-3 mt-0.5" />
                 <p className="text-sm text-muted-foreground">
                   123 Market Street, Suite 456<br />
                   Metro Manila, Philippines
                 </p>
-              </div>
+              </div> */}
               <div className="flex items-center">
                 <Mail className="h-5 w-5 text-muted-foreground mr-3" />
                 <a href="mailto:support@localnook.com" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -126,7 +126,7 @@ const Footer = () => {
         <div className="border-t border-border mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} LocalNook. All rights reserved.
+              © {new Date().getFullYear()} LokalNest. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">

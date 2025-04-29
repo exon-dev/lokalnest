@@ -58,17 +58,30 @@ const NotificationsMenu = () => {
       setUnreadCount(prev => Math.max(0, prev - 1));
     }
     
+    // Add debug logging
+    console.log('Clicked notification:', notification);
+    console.log('Notification data:', notification.data);
+    console.log('Notification type:', notification.type);
+    
     // Handle navigation based on notification type
     switch (notification.type) {
       // Seller notifications
       case 'new_order':
-        navigate('/seller/orders');
+        if (notification.data?.order_id) {
+          console.log('Navigating to specific order:', notification.data.order_id);
+          navigate(`/seller/dashboard/orders`);
+        } else {
+          console.log('Navigating to general orders page - missing order_id');
+          navigate('/seller/dashboard/orders');
+        }
         break;
       case 'low_stock':
-        navigate('/seller/products');
+        navigate('/seller/dashboard/products');
         break;
       case 'new_review':
-        navigate(`/seller/reviews`);
+      case 'review':
+        console.log('Navigating to seller reviews page');
+        navigate('/seller/dashboard/reviews');
         break;
 
       // Buyer order status notifications
@@ -76,8 +89,10 @@ const NotificationsMenu = () => {
       case 'shipped':
       case 'delivered':
         if (notification.data?.order_id) {
-          navigate(`/buyer/orders/${notification.data.order_id}`);
+          console.log('Navigating to specific buyer order:', notification.data.order_id);
+          navigate('/buyer/orders');
         } else {
+          console.log('Navigating to general buyer orders page');
           navigate('/buyer/orders');
         }
         break;

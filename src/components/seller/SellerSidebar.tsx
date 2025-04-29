@@ -15,7 +15,8 @@ import {
   Boxes,
   Menu,
   ShieldCheck,
-  ShieldAlert
+  ShieldAlert,
+  MessageSquare
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -42,6 +43,7 @@ const SellerSidebar: React.FC<SellerSidebarProps> = ({ user }) => {
   const currentPath = location.pathname;
   const [isVerified, setIsVerified] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [unreadMessageCount, setUnreadMessageCount] = useState<number>(0);
 
   // Check verification status directly from seller_verifications table
   useEffect(() => {
@@ -72,8 +74,63 @@ const SellerSidebar: React.FC<SellerSidebarProps> = ({ user }) => {
 
     if (user?.id) {
       checkVerificationStatus();
+      fetchUnreadMessageCount();
     }
   }, [user?.id]);
+
+  // Set up real-time subscription for new messages
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('unread-message-count')
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `recipient_id=eq.${user.id}` 
+        }, 
+        () => {
+          fetchUnreadMessageCount();
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `recipient_id=eq.${user.id}` 
+        }, 
+        () => {
+          fetchUnreadMessageCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [user?.id]);
+
+  // Fetch count of unread messages
+  const fetchUnreadMessageCount = async () => {
+    if (!user?.id) return;
+
+    try {
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('recipient_id', user.id)
+        .eq('read', false);
+      
+      if (error) throw error;
+      
+      setUnreadMessageCount(count || 0);
+    } catch (error) {
+      console.error('Error fetching unread message count:', error);
+    }
+  };
 
   const navItems: NavItem[] = [
     {
@@ -101,6 +158,13 @@ const SellerSidebar: React.FC<SellerSidebarProps> = ({ user }) => {
       variant: currentPath === '/seller/dashboard/orders' ? 'default' : 'ghost'
     },
     {
+      title: 'Messages',
+      href: '/seller/dashboard/messages',
+      icon: <MessageSquare className="h-5 w-5" />,
+      variant: currentPath === '/seller/dashboard/messages' ? 'default' : 'ghost',
+      badge: unreadMessageCount > 0 ? unreadMessageCount.toString() : undefined
+    },
+    {
       title: 'Customers',
       href: '/seller/dashboard/customers',
       icon: <Users className="h-5 w-5" />,
@@ -115,7 +179,7 @@ const SellerSidebar: React.FC<SellerSidebarProps> = ({ user }) => {
     {
       title: 'Reviews',
       href: '/seller/dashboard/reviews',
-      icon: <Star className="h -5 w-5" />,
+      icon: <Star className="h-5 w-5" />,
       variant: currentPath === '/seller/dashboard/reviews' ? 'default' : 'ghost'
     },
     {
@@ -195,7 +259,7 @@ const SellerSidebar: React.FC<SellerSidebarProps> = ({ user }) => {
                   {item.icon}
                   <span className="ml-2">{item.title}</span>
                   {item.badge && (
-                    <Badge className="ml-auto" variant="default">
+                    <Badge className="ml-auto bg-red-500 hover:bg-red-600" variant="default">
                       {item.badge}
                     </Badge>
                   )}

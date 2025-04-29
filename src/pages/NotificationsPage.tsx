@@ -100,28 +100,38 @@ const NotificationsPage = () => {
   const handleNotificationClick = async (notification: Notification) => {
     await handleMarkAsRead(notification);
     
+    // Add debug logging
+    console.log('NotificationsPage - Clicked notification:', notification);
+    console.log('NotificationsPage - Notification data:', notification.data);
+    console.log('NotificationsPage - Notification type:', notification.type);
+    
     // Navigate based on notification type
     switch (notification.type) {
       // Seller notifications
       case 'new_order':
-        navigate('/seller/orders');
+        if (notification.data?.order_id) {
+          console.log('NotificationsPage - Navigating to specific order:', notification.data.order_id);
+          navigate(`/seller/dashboard/orders`);
+        } else {
+          console.log('NotificationsPage - Navigating to general orders page - missing order_id');
+          navigate('/seller/dashboard/orders');
+        }
         break;
       case 'low_stock':
-        navigate('/seller/products');
+        navigate('/seller/dashboard/products');
         break;
       case 'new_review':
-        navigate(`/seller/reviews`);
+      case 'review':
+        console.log('NotificationsPage - Navigating to seller reviews page');
+        navigate('/seller/dashboard/reviews');
         break;
 
       // Buyer order status notifications
       case 'payment_approved':
       case 'shipped':
       case 'delivered':
-        if (notification.data?.order_id) {
-          navigate(`/buyer/orders/${notification.data.order_id}`);
-        } else {
-          navigate('/buyer/orders');
-        }
+        console.log('NotificationsPage - Navigating to buyer orders page');
+        navigate('/buyer/orders');
         break;
         
       // Buyer review notifications
@@ -290,4 +300,4 @@ const NotificationsPage = () => {
   );
 };
 
-export default NotificationsPage; 
+export default NotificationsPage;

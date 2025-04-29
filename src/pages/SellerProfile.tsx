@@ -12,10 +12,13 @@ import {
   Facebook, 
   Instagram, 
   Star, 
-  Loader2 
+  Loader2,
+  MessageSquare
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getSellerProfile, getSellerProducts, SellerProfile as BaseSellerProfile } from '@/services/sellerService';
+import BuyerMessaging from '@/components/buyer/messaging/BuyerMessaging';
+import { supabase } from '@/integrations/supabase/client';
 
 // Extend the SellerProfile type to include missing properties
 interface SellerProfile extends BaseSellerProfile {
@@ -43,6 +46,8 @@ const SellerProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [seller, setSeller] = useState<SellerProfile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [isMessagingOpen, setIsMessagingOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     async function loadSellerData() {
@@ -71,8 +76,24 @@ const SellerProfilePage = () => {
     }
     
     loadSellerData();
+    
+    // Check if the user is logged in
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsLoggedIn(!!session);
+    };
+    
+    checkAuth();
   }, [id]);
   
+  const handleMessageSeller = () => {
+    if (!isLoggedIn) {
+      toast.error("Please sign in to message this seller");
+      return;
+    }
+    setIsMessagingOpen(true);
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -117,7 +138,16 @@ const SellerProfilePage = () => {
             </div>
             
             <div className="flex-1">
-              <h1 className="text-2xl font-semibold">{seller.business_name}</h1>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <h1 className="text-2xl font-semibold">{seller.business_name}</h1>
+                <Button 
+                  onClick={handleMessageSeller} 
+                  className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Message Seller
+                </Button>
+              </div>
               <div className="flex items-center mt-1 text-sm text-muted-foreground">
                 <Star className="h-4 w-4 text-yellow-500 fill-yellow-500 mr-1" />
                 <span>4.9 • {products.length} products</span>
@@ -253,6 +283,19 @@ const SellerProfilePage = () => {
           </div>
         )}
       </div>
+
+      {/* Messaging Dialog */}
+      {seller && (
+        <BuyerMessaging
+          seller={{
+            id: seller.id,
+            name: seller.business_name,
+            avatar_url: seller.logo_url || undefined
+          }}
+          isOpen={isMessagingOpen}
+          onClose={() => setIsMessagingOpen(false)}
+        />
+      )}
     </Layout>
   );
 };

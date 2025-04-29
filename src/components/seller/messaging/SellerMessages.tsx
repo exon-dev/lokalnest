@@ -1,37 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Search } from 'lucide-react';
+import { Search, MessageSquare } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
-import BuyerMessaging from './BuyerMessaging';
+import CustomerMessaging from '../customers/CustomerMessaging';
+import { Customer } from '../customers/types';
 
-interface Seller {
-  id: string;
-  name: string;
-  avatar_url?: string;
-}
-
+// Types for message previews
 interface MessagePreview {
-  seller_id: string;
-  seller_name: string;
-  seller_avatar?: string;
+  customer_id: string;
+  customer_name: string;
+  customer_email: string;
+  customer_avatar?: string;
   last_message: string;
   last_message_time: string;
   unread_count: number;
 }
 
-const BuyerMessages = () => {
+const SellerMessages = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [messagePreviews, setMessagePreviews] = useState<MessagePreview[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isMessagingOpen, setIsMessagingOpen] = useState(false);
   const subscriptionRef = useRef<any>(null);
-  
+
   useEffect(() => {
     fetchMessagePreviews();
     setupSubscription();
@@ -48,7 +44,7 @@ const BuyerMessages = () => {
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) return;
 
-      const userId = session.session.user.id;
+      const sellerId = session.session.user.id;
       
       // Unsubscribe from any existing subscription
       if (subscriptionRef.current) {
@@ -56,7 +52,7 @@ const BuyerMessages = () => {
       }
       
       // Create a unique channel ID
-      const channelId = `buyer-message-previews-${userId}-${Date.now()}`;
+      const channelId = `seller-message-previews-${sellerId}-${Date.now()}`;
       
       // Listen for any new messages
       const channel = supabase
@@ -66,10 +62,10 @@ const BuyerMessages = () => {
             event: 'INSERT', 
             schema: 'public', 
             table: 'messages',
-            filter: `or(recipient_id=eq.${userId},sender_id=eq.${userId})` 
+            filter: `or(recipient_id=eq.${sellerId},sender_id=eq.${sellerId})` 
           }, 
           () => {
-            console.log('New message received in buyer messages list, refreshing...');
+            console.log('New message received in seller messages list, refreshing...');
             fetchMessagePreviews();
           }
         )
@@ -78,15 +74,15 @@ const BuyerMessages = () => {
             event: 'UPDATE', 
             schema: 'public', 
             table: 'messages',
-            filter: `or(recipient_id=eq.${userId},sender_id=eq.${userId})` 
+            filter: `or(recipient_id=eq.${sellerId},sender_id=eq.${sellerId})` 
           }, 
           () => {
-            console.log('Message updated in buyer messages list, refreshing...');
+            console.log('Message updated in seller messages list, refreshing...');
             fetchMessagePreviews();
           }
         )
         .subscribe((status) => {
-          console.log(`Buyer message list subscription status: ${status}`);
+          console.log(`Seller message list subscription status: ${status}`);
         });
         
       subscriptionRef.current = channel;
@@ -94,7 +90,7 @@ const BuyerMessages = () => {
       console.error('Error setting up message preview subscription:', error);
     }
   };
-  
+
   const fetchMessagePreviews = async () => {
     setLoading(true);
     try {
@@ -104,43 +100,33 @@ const BuyerMessages = () => {
         return;
       }
 
-      const userId = session.session.user.id;
+      const sellerId = session.session.user.id;
       
-      // Get all messages where the current user is either sender or recipient
+      // Get all messages where the seller is either sender or recipient
       const { data: messages, error: messagesError } = await supabase
         .from('messages')
         .select('*')
-        .or(`recipient_id.eq.${userId},sender_id.eq.${userId}`)
+        .or(`recipient_id.eq.${sellerId},sender_id.eq.${sellerId}`)
         .order('created_at', { ascending: false });
 
       if (messagesError) throw messagesError;
 
       if (messages && messages.length > 0) {
-        // Get unique conversation partners (both people the user sent messages to and received from)
+        // Get unique conversation partners (both people the seller sent messages to and received from)
         // For each message, the partner is the other person in the conversation
         const conversationPartnerIds = [...new Set(
           messages.map(msg => 
-            msg.sender_id === userId ? msg.recipient_id : msg.sender_id
+            msg.sender_id === sellerId ? msg.recipient_id : msg.sender_id
           )
         )];
         
-        // Fetch partner profiles (these could be sellers or other users)
-        const { data: partnerProfiles, error: profilesError } = await supabase
+        // Fetch partner profiles 
+        const { data: customerProfiles, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, full_name, avatar_url')
+          .select('id, full_name, email, avatar_url')
           .in('id', conversationPartnerIds);
 
         if (profilesError) throw profilesError;
-
-        // Also get seller profiles for additional business name information
-        const { data: sellerProfiles, error: sellerProfilesError } = await supabase
-          .from('seller_profiles')
-          .select('id, business_name, logo_url')
-          .in('id', conversationPartnerIds);
-
-        if (sellerProfilesError) {
-          console.error('Error fetching seller profiles:', sellerProfilesError);
-        }
         
         // Create preview objects
         const previews: MessagePreview[] = [];
@@ -149,8 +135,8 @@ const BuyerMessages = () => {
         for (const partnerId of conversationPartnerIds) {
           // Get all messages in this conversation
           const conversationMessages = messages.filter(msg => 
-            (msg.sender_id === partnerId && msg.recipient_id === userId) || 
-            (msg.sender_id === userId && msg.recipient_id === partnerId)
+            (msg.sender_id === partnerId && msg.recipient_id === sellerId) || 
+            (msg.sender_id === sellerId && msg.recipient_id === partnerId)
           );
           
           // Sort messages by creation time (newest first)
@@ -160,22 +146,18 @@ const BuyerMessages = () => {
           
           const latestMessage = conversationMessages[0];
           
-          // Find profile information
-          const partnerProfile = partnerProfiles?.find(profile => profile.id === partnerId);
-          if (!partnerProfile) continue;
-          
-          // Check if partner is a seller with a business profile
-          const sellerProfile = sellerProfiles?.find(profile => profile.id === partnerId);
+          // Find customer profile information
+          const customerProfile = customerProfiles?.find(profile => profile.id === partnerId);
+          if (!customerProfile) continue;
           
           previews.push({
-            seller_id: partnerId,
-            // Use business name if available, otherwise use personal name
-            seller_name: sellerProfile?.business_name || partnerProfile.full_name || 'Unknown',
-            // Use logo if available, otherwise use avatar
-            seller_avatar: sellerProfile?.logo_url || partnerProfile.avatar_url,
+            customer_id: partnerId,
+            customer_name: customerProfile.full_name || 'Unknown Customer',
+            customer_email: customerProfile.email || '',
+            customer_avatar: customerProfile.avatar_url,
             last_message: latestMessage.message_content,
             last_message_time: latestMessage.created_at,
-            // Count unread messages (only those sent by the partner and not read by user)
+            // Count unread messages (only those sent by the customer and not read)
             unread_count: conversationMessages.filter(msg => 
               msg.sender_id === partnerId && !msg.read
             ).length
@@ -195,43 +177,50 @@ const BuyerMessages = () => {
   };
 
   const handleOpenChat = (preview: MessagePreview) => {
-    setSelectedSeller({
-      id: preview.seller_id,
-      name: preview.seller_name,
-      avatar_url: preview.seller_avatar
+    // Create a Customer object that matches the expected type
+    setSelectedCustomer({
+      id: preview.customer_id,
+      full_name: preview.customer_name,
+      email: preview.customer_email,
+      avatar_url: preview.customer_avatar,
+      total_orders: 0,
+      total_spent: 0,
+      last_purchase_date: '',
+      status: 'active',
+      tags: []
     });
     setIsMessagingOpen(true);
-    
+
     // If there are unread messages, mark them as read locally
     if (preview.unread_count > 0) {
       // Update the unread count in the UI immediately
       setMessagePreviews(prevPreviews => 
         prevPreviews.map(prev => 
-          prev.seller_id === preview.seller_id 
+          prev.customer_id === preview.customer_id 
             ? { ...prev, unread_count: 0 }
             : prev
         )
       );
       
       // Also mark the messages as read in the database
-      markConversationAsRead(preview.seller_id);
+      markConversationAsRead(preview.customer_id);
     }
   };
 
   // Function to mark all messages in a conversation as read
-  const markConversationAsRead = async (sellerId: string) => {
+  const markConversationAsRead = async (customerId: string) => {
     try {
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) return;
       
-      const userId = session.session.user.id;
+      const sellerId = session.session.user.id;
       
-      // Update all unread messages from this seller to read status
+      // Update all unread messages from this customer to read status
       const { error } = await supabase
         .from('messages')
         .update({ read: true })
-        .eq('sender_id', sellerId)
-        .eq('recipient_id', userId)
+        .eq('sender_id', customerId)
+        .eq('recipient_id', sellerId)
         .eq('read', false);
         
       if (error) {
@@ -243,7 +232,7 @@ const BuyerMessages = () => {
   };
 
   const filteredPreviews = messagePreviews.filter(preview => 
-    preview.seller_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    preview.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     preview.last_message.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -267,8 +256,8 @@ const BuyerMessages = () => {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
-          <CardTitle>Messages</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Customer Messages</CardTitle>
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -290,25 +279,25 @@ const BuyerMessages = () => {
               <MessageSquare className="h-12 w-12 text-muted-foreground opacity-20" />
               <p className="text-sm text-muted-foreground">No messages yet</p>
               <p className="text-xs text-center text-muted-foreground max-w-sm">
-                When you make a purchase or interact with sellers, your conversations will appear here.
+                When customers contact you, their messages will appear here.
               </p>
             </div>
           ) : (
             <div className="space-y-2">
               {filteredPreviews.map((preview) => (
                 <div 
-                  key={preview.seller_id}
+                  key={preview.customer_id}
                   className="p-4 border border-border rounded-lg hover:bg-muted/30 cursor-pointer transition-colors"
                   onClick={() => handleOpenChat(preview)}
                 >
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={preview.seller_avatar} />
-                      <AvatarFallback>{getInitials(preview.seller_name)}</AvatarFallback>
+                      <AvatarImage src={preview.customer_avatar} />
+                      <AvatarFallback>{getInitials(preview.customer_name)}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 space-y-1">
                       <div className="flex justify-between items-center">
-                        <h4 className="font-medium">{preview.seller_name}</h4>
+                        <h4 className="font-medium">{preview.customer_name}</h4>
                         <span className="text-xs text-muted-foreground">
                           {formatMessageTime(preview.last_message_time)}
                         </span>
@@ -332,8 +321,8 @@ const BuyerMessages = () => {
         </CardContent>
       </Card>
 
-      <BuyerMessaging 
-        seller={selectedSeller}
+      <CustomerMessaging 
+        customer={selectedCustomer}
         isOpen={isMessagingOpen}
         onClose={() => {
           setIsMessagingOpen(false);
@@ -344,4 +333,4 @@ const BuyerMessages = () => {
   );
 };
 
-export default BuyerMessages;
+export default SellerMessages;

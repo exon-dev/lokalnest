@@ -158,7 +158,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
   };
 
   const isDelivered = order.status === 'delivered';
-  const isProcessing = order.status === 'processing';
+  const canBeCancelled = order.status === 'processing';
 
   return (
     <>
@@ -215,7 +215,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
               </div>
             )}
             
-            {isProcessing && (
+            {canBeCancelled && (
               <div className="flex justify-end pt-4">
                 <Button 
                   variant="destructive" 

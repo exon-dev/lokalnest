@@ -21,7 +21,7 @@ LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 BEGIN
   INSERT INTO public.seller_profiles (
-    id,
+    id, 
     business_name,
     description,
     contact_email,

@@ -130,9 +130,17 @@ const CustomerMessaging: React.FC<CustomerMessagingProps> = ({ customer, isOpen,
         return;
       }
 
-      // Create a channel for real-time updates - this improved approach catches both sent and received messages
+      // Unsubscribe from any existing channel first
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+      }
+
+      // Create a unique channel ID to avoid conflicts
+      const channelId = `seller-messages-${currentUserId}-${customerId}-${Date.now()}`;
+
+      // Create a channel for real-time updates
       const channel = supabase
-        .channel('seller-messages')
+        .channel(channelId)
         .on(
           'postgres_changes',
           {
@@ -142,6 +150,7 @@ const CustomerMessaging: React.FC<CustomerMessagingProps> = ({ customer, isOpen,
             filter: `or(and(sender_id=eq.${currentUserId},recipient_id=eq.${customerId}),and(sender_id=eq.${customerId},recipient_id=eq.${currentUserId}))`,
           },
           (payload) => {
+            console.log('Seller received new message:', payload.new);
             // Process any new message in this conversation
             const newMessage = payload.new as Message;
             
@@ -157,7 +166,9 @@ const CustomerMessaging: React.FC<CustomerMessagingProps> = ({ customer, isOpen,
             }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log(`Subscription status for seller messages: ${status}`);
+        });
 
       subscriptionRef.current = channel;
     } catch (error) {
@@ -340,29 +351,58 @@ const CustomerMessaging: React.FC<CustomerMessagingProps> = ({ customer, isOpen,
         imageUrl = await uploadImage(selectedImage);
       }
       
+      // Create a temporary message object with a UUID for optimistic UI updates
+      const newMessageId = uuidv4();
+      const timestamp = new Date().toISOString();
       const newMessage = {
+        id: newMessageId,
         sender_id: sellerId,
         recipient_id: customerId,
         message_content: message.trim(),
         image_url: imageUrl,
-        read: false
+        read: false,
+        created_at: timestamp
       };
       
-      const { error } = await supabase
+      // Optimistically add the message to the UI immediately
+      setMessages(prevMessages => [...prevMessages, newMessage as Message]);
+      
+      // Clear input fields
+      setMessage('');
+      setSelectedImage(null);
+      setPreviewUrl(null);
+      
+      // Then send to the server
+      const { error, data } = await supabase
         .from('messages')
-        .insert(newMessage);
+        .insert({
+          sender_id: sellerId,
+          recipient_id: customerId,
+          message_content: message.trim(),
+          image_url: imageUrl,
+          read: false
+        })
+        .select();
       
       if (error) {
         console.error('Error detail:', error);
+        // If there was an error, we could remove the optimistic message
+        // setMessages(prevMessages => prevMessages.filter(msg => msg.id !== newMessageId));
         throw error;
       }
       
-      setMessage('');
-      setSelectedImage(null); 
-      setPreviewUrl(null);
+      // Update the temporary message with the real one from the database
+      if (data && data[0]) {
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === newMessageId ? data[0] as Message : msg
+          )
+        );
+      }
       
-      // The message will appear via the subscription rather than adding it manually
-      // This ensures consistent behavior between both parties
+      // Ensure we scroll to the bottom to show the new message
+      setTimeout(() => scrollToBottom(), 100);
+      
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');

@@ -43,7 +43,11 @@ const SellerSettings = () => {
     review_notifications: true,
     price_drop_notifications: false,
     restocked_notifications: false,
-    promotion_notifications: false
+    promotion_notifications: false,
+    payment_approved_notifications: false,
+    order_shipped_notifications: false,
+    order_delivered_notifications: false,
+    review_reply_notifications: false
   });
   const [savingNotifications, setSavingNotifications] = useState(false);
 
@@ -383,7 +387,7 @@ const SellerSettings = () => {
                   />
                 </div>
                 
-                <div className="flex items-center justify-between">
+                {/* <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">Product Stock Alerts</h3>
                     <p className="text-sm text-muted-foreground">Get notified when products are low in stock</p>
@@ -392,7 +396,7 @@ const SellerSettings = () => {
                     checked={notificationPrefs.stock_alerts}
                     onCheckedChange={() => handleNotificationToggle('stock_alerts')}
                   />
-                </div>
+                </div> */}
                 
                 <div className="flex items-center justify-between">
                   <div>

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +17,9 @@ interface OrderActionsProps {
 }
 
 const OrderActions: React.FC<OrderActionsProps> = ({ orderId, status, onUpdateStatus }) => {
+  // Check if the order status is cancelled
+  const isCancelled = status === 'cancelled';
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -30,27 +32,33 @@ const OrderActions: React.FC<OrderActionsProps> = ({ orderId, status, onUpdateSt
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuSeparator />
         
-        {status === 'processing' && (
-          <DropdownMenuItem onClick={() => onUpdateStatus(orderId, 'shipped')}>
-            <Truck className="mr-2 h-4 w-4" />
-            Mark as Shipped
-          </DropdownMenuItem>
+        {/* Only show status change options if the order is not cancelled */}
+        {!isCancelled && (
+          <>
+            {status === 'processing' && (
+              <DropdownMenuItem onClick={() => onUpdateStatus(orderId, 'shipped')}>
+                <Truck className="mr-2 h-4 w-4" />
+                Mark as Shipped
+              </DropdownMenuItem>
+            )}
+            
+            {status === 'shipped' && (
+              <DropdownMenuItem onClick={() => onUpdateStatus(orderId, 'delivered')}>
+                <ClipboardCheck className="mr-2 h-4 w-4" />
+                Mark as Delivered
+              </DropdownMenuItem>
+            )}
+            
+            {(status === 'processing' || status === 'shipped') && (
+              <DropdownMenuItem onClick={() => onUpdateStatus(orderId, 'cancelled')}>
+                <Tag className="mr-2 h-4 w-4" />
+                Cancel Order
+              </DropdownMenuItem>
+            )}
+          </>
         )}
         
-        {status === 'shipped' && (
-          <DropdownMenuItem onClick={() => onUpdateStatus(orderId, 'delivered')}>
-            <ClipboardCheck className="mr-2 h-4 w-4" />
-            Mark as Delivered
-          </DropdownMenuItem>
-        )}
-        
-        {(status === 'processing' || status === 'shipped') && (
-          <DropdownMenuItem onClick={() => onUpdateStatus(orderId, 'cancelled')}>
-            <Tag className="mr-2 h-4 w-4" />
-            Cancel Order
-          </DropdownMenuItem>
-        )}
-        
+        {/* Always show view order details */}
         <DropdownMenuItem>
           <Package className="mr-2 h-4 w-4" />
           View Order Details
