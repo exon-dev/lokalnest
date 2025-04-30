@@ -283,13 +283,29 @@ const OrderManagement = () => {
         return;
       }
 
-      // Use the imported updateOrderStatus function that sends notifications
+      // First update payment_status directly to ensure it triggers database listeners
+      const { error: paymentStatusError } = await supabase
+        .from('orders')
+        .update({ payment_status: 'approved' })
+        .eq('id', orderId);
+        
+      if (paymentStatusError) {
+        console.error('Error updating payment status:', paymentStatusError);
+        toast.error('Failed to update payment status');
+        return;
+      }
+
+      // Then use the imported updateOrderStatus function that sends notifications
       const success = await updateOrderStatus(orderId, 'payment_approved' as OrderStatus);
       
       if (success) {
-        // Update local state
+        // Update local state with both status changes
         setOrders(orders.map(order => 
-          order.id === orderId ? { ...order, status: 'payment_approved', payment_status: 'approved' } : order
+          order.id === orderId ? { 
+            ...order, 
+            status: 'payment_approved', 
+            payment_status: 'approved' 
+          } : order
         ));
         
         toast.success(`Payment approved and order status updated`);

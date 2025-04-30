@@ -302,9 +302,9 @@ const Profile = () => {
                         name="state"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>State</FormLabel>
+                            <FormLabel>Province</FormLabel>
                             <FormControl>
-                              <Input placeholder="State" {...field} />
+                              <Input placeholder="Province" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

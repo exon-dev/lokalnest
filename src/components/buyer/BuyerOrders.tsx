@@ -39,7 +39,7 @@ const BuyerOrders = () => {
           <h2 className="text-2xl font-semibold">My Orders</h2>
           <p className="text-muted-foreground">Track and manage your orders</p>
         </div>
-        <Button size="sm">Contact Support</Button>
+        {/* <Button size="sm">Contact Support</Button> */}
       </div>
 
       <Tabs defaultValue="all" className="space-y-4">

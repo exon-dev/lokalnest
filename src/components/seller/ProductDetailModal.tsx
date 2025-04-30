@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Package2, Tag, Calendar, Layers, Info } from 'lucide-react';
+import { Edit, Package2, Tag, Calendar, Layers, Info, PercentIcon, TagIcon } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 interface ProductDetailModalProps {
@@ -118,6 +118,40 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ isOpen, onClose
                 {product.description || 'No description provided.'}
               </p>
             </div>
+
+            {/* Promotion Information */}
+            {product.promotion && (
+              <div className="space-y-2">
+                <h3 className="font-medium">Active Promotion</h3>
+                <div className="bg-secondary/50 rounded-md p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-sm">{product.promotion.title}</span>
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      {product.promotion.discount_type === 'percentage' ? (
+                        <>
+                          <PercentIcon className="h-3 w-3" />
+                          {product.promotion.discount_value}% off
+                        </>
+                      ) : (
+                        <>
+                          <TagIcon className="h-3 w-3" />
+                          ₱{product.promotion.discount_value} off
+                        </>
+                      )}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{product.promotion.description}</p>
+                  {product.sale_price && (
+                    <div className="mt-2 text-sm">
+                      <span className="text-muted-foreground">Original: </span>
+                      <span className="line-through">₱{product.price?.toFixed(2)}</span>
+                      <span className="text-muted-foreground ml-2">Promotional: </span>
+                      <span className="font-medium text-primary">₱{product.sale_price?.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {product.tags && product.tags.length > 0 && (
               <div className="space-y-2">

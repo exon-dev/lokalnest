@@ -5,7 +5,8 @@ import {
   CheckCircle2, 
   XCircle,
   Plus,
-  Loader2
+  Loader2,
+  Package
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,15 +55,6 @@ interface PaymentMethod {
   isDefault: boolean;
 }
 
-interface Transaction {
-  id: string;
-  date: string;
-  amount: number;
-  description: string;
-  status: 'completed' | 'pending' | 'failed';
-  paymentMethod: string;
-}
-
 const BuyerPayments = () => {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
     {
@@ -95,6 +87,23 @@ const BuyerPayments = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("card");
 
+  // Enhanced Transaction interface to include product info
+  interface TransactionProduct {
+    name: string;
+    image?: string;
+  }
+
+  // Update Transaction interface to include product info
+  interface Transaction {
+    id: string;
+    date: string;
+    amount: number;
+    description: string;
+    status: 'completed' | 'pending' | 'failed';
+    paymentMethod: string;
+    products: TransactionProduct[];
+  }
+
   // Fetch transaction history for the current buyer
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -121,15 +130,64 @@ const BuyerPayments = () => {
         if (ordersError) {
           throw ordersError;
         }
-        
-        // Transform the orders data into transaction format
-        const transformedTransactions: Transaction[] = orders.map(order => ({
-          id: order.id,
-          date: order.created_at,
-          amount: order.total_amount,
-          description: `Order #${order.id.slice(0, 8).toUpperCase()}`,
-          status: mapPaymentStatusToTransactionStatus(order.payment_status, order.status),
-          paymentMethod: formatPaymentMethodName(order.payment_method)
+
+        // Fetch product details for each order
+        const transformedTransactions: Transaction[] = await Promise.all(orders.map(async (order) => {
+          // Get order items for this order
+          const { data: orderItems, error: itemsError } = await supabase
+            .from('order_items')
+            .select('product_id, quantity')
+            .eq('order_id', order.id);
+            
+          if (itemsError) {
+            console.error('Error fetching order items:', itemsError);
+            return {
+              id: order.id,
+              date: order.created_at,
+              amount: order.total_amount,
+              description: `Order #${order.id.slice(0, 8).toUpperCase()}`,
+              status: mapPaymentStatusToTransactionStatus(order.payment_status, order.status),
+              paymentMethod: formatPaymentMethodName(order.payment_method),
+              products: []
+            };
+          }
+
+          // Get product details for each item
+          const products: TransactionProduct[] = [];
+          
+          for (const item of orderItems || []) {
+            // Get product name
+            const { data: product } = await supabase
+              .from('products')
+              .select('name')
+              .eq('id', item.product_id)
+              .single();
+
+            // Get product image
+            const { data: images } = await supabase
+              .from('product_images')
+              .select('url')
+              .eq('product_id', item.product_id)
+              .eq('is_primary', true)
+              .limit(1);
+
+            if (product) {
+              products.push({
+                name: product.name,
+                image: images && images.length > 0 ? images[0].url : undefined
+              });
+            }
+          }
+          
+          return {
+            id: order.id,
+            date: order.created_at,
+            amount: order.total_amount,
+            description: `Order #${order.id.slice(0, 8).toUpperCase()}`,
+            status: mapPaymentStatusToTransactionStatus(order.payment_status, order.status),
+            paymentMethod: formatPaymentMethodName(order.payment_method),
+            products
+          };
         }));
         
         setTransactions(transformedTransactions);
@@ -144,16 +202,83 @@ const BuyerPayments = () => {
     
     fetchTransactions();
   }, []);
+
+  // Set up real-time subscription for order status updates
+  useEffect(() => {
+    const setupOrderSubscription = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        
+        const buyerId = session.user.id;
+
+        // Subscribe to order status changes
+        const channel = supabase
+          .channel('order-payment-updates')
+          .on('postgres_changes', 
+            { 
+              event: 'UPDATE', 
+              schema: 'public', 
+              table: 'orders',
+              filter: `buyer_id=eq.${buyerId}` 
+            }, 
+            (payload) => {
+              console.log('Order status updated:', payload);
+              
+              // Update the relevant transaction in our state
+              setTransactions(prev => 
+                prev.map(transaction => {
+                  if (transaction.id === payload.new.id) {
+                    return {
+                      ...transaction,
+                      status: mapPaymentStatusToTransactionStatus(
+                        payload.new.payment_status, 
+                        payload.new.status
+                      )
+                    };
+                  }
+                  return transaction;
+                })
+              );
+              
+              // Show toast notification about the update
+              if (payload.new.payment_status === 'approved' || payload.new.payment_status === 'paid') {
+                toast.success(`Payment for order #${payload.new.id.slice(0, 8).toUpperCase()} has been approved!`);
+              }
+            }
+          )
+          .subscribe();
+
+        // Cleanup subscription on component unmount
+        return () => {
+          channel.unsubscribe();
+        };
+      } catch (error) {
+        console.error('Error setting up order subscription:', error);
+      }
+    };
+
+    setupOrderSubscription();
+  }, []);
   
   // Helper function to map payment status from DB to UI status
   const mapPaymentStatusToTransactionStatus = (paymentStatus: string, orderStatus: string): 'completed' | 'pending' | 'failed' => {
+    // First check payment status
     if (paymentStatus === 'approved' || paymentStatus === 'paid') {
       return 'completed';
     } else if (paymentStatus === 'failed' || paymentStatus === 'rejected') {
       return 'failed';
-    } else {
-      return 'pending';
+    } 
+    
+    // Then check order status for additional context
+    if (orderStatus === 'payment_approved' || orderStatus === 'shipped' || orderStatus === 'delivered') {
+      return 'completed';
+    } else if (orderStatus === 'cancelled') {
+      return 'failed';
     }
+    
+    // Default to pending
+    return 'pending';
   };
   
   // Helper function to format payment method name
@@ -425,19 +550,58 @@ const BuyerPayments = () => {
               ) : (
                 <div className="space-y-2">
                   {transactions.map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-4 border border-border rounded-md">
-                      <div className="space-y-1">
-                        <div className="flex items-center">
-                          <h3 className="font-medium">{transaction.description}</h3>
-                          <div className="ml-3 flex items-center">
-                            {getStatusIcon(transaction.status)}
-                            {getStatusBadge(transaction.status)}
-                          </div>
+                    <div key={transaction.id} className="p-4 border border-border rounded-md">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          {getStatusIcon(transaction.status)}
+                          {getStatusBadge(transaction.status)}
                         </div>
-                        <p className="text-sm text-muted-foreground">{new Date(transaction.date).toLocaleDateString()}</p>
-                        <p className="text-xs text-muted-foreground">{transaction.paymentMethod}</p>
+                        <p className="font-semibold">₱{transaction.amount.toLocaleString()}</p>
                       </div>
-                      <p className="font-semibold">₱{transaction.amount.toLocaleString()}</p>
+                      
+                      {/* Product Information Section */}
+                      <div className="mt-2">
+                        {transaction.products && transaction.products.length > 0 ? (
+                          <div className="space-y-2">
+                            {transaction.products.slice(0, 2).map((product, index) => (
+                              <div key={index} className="flex items-center gap-3">
+                                <div className="h-12 w-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                                  {product.image ? (
+                                    <img 
+                                      src={product.image} 
+                                      alt={product.name} 
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="h-full w-full flex items-center justify-center bg-secondary">
+                                      <Package className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{product.name}</p>
+                                </div>
+                              </div>
+                            ))}
+                            
+                            {/* Show count of additional products if there are more than 2 */}
+                            {transaction.products.length > 2 && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                +{transaction.products.length - 2} more items
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">
+                            {transaction.description}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+                        <div>{new Date(transaction.date).toLocaleDateString()}</div>
+                        <div>{transaction.paymentMethod}</div>
+                      </div>
                     </div>
                   ))}
                   

@@ -39,6 +39,18 @@ interface Promotion {
   is_active: boolean;
 }
 
+// This type is for internal use only, not used with Supabase directly
+interface ProductPromotion {
+  product_id: string;
+  promotion_id: string;
+  created_at?: string;
+}
+
+// Define a type-safe wrapper around supabase for custom tables
+const customTable = (tableName: string) => {
+  return supabase.from(tableName as any);
+};
+
 const ProductFormModal: React.FC<ProductFormModalProps> = ({ 
   isOpen, 
   onClose, 
@@ -59,7 +71,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     materials: '',
     shipping_info: '',
     tags: [] as string[],
-    promotion_id: '' // Changed from promotions array to a single promotion_id string
+    promotions: [] as string[]
   });
   
   const [currentTag, setCurrentTag] = useState('');
@@ -83,12 +95,14 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         materials: product.materials || '',
         shipping_info: product.shipping_info || '',
         tags: product.tags || [],
-        promotion_id: product.promotion_id || '' // Get existing promotion_id
+        promotions: product.promotions || []
       });
 
       // If editing an existing product, fetch all its images
       if (product.id) {
         fetchProductImages(product.id);
+        // Fetch product promotions if editing
+        fetchProductPromotions(product.id);
       }
     }
     
@@ -116,6 +130,30 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     } catch (error) {
       console.error('Error fetching promotions:', error);
       toast.error('Failed to load promotions');
+    }
+  };
+
+  // Fetch existing product-promotion associations
+  const fetchProductPromotions = async (productId: string) => {
+    try {
+      // Use our custom table wrapper to avoid type errors
+      const { data, error } = await customTable('product_promotions')
+        .select('promotion_id')
+        .eq('product_id', productId);
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        // Handle the data with appropriate type assertion
+        const promotionIds = data.map((item: any) => item.promotion_id).filter(Boolean);
+          
+        setFormData(prev => ({
+          ...prev,
+          promotions: promotionIds
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching product promotions:', error);
     }
   };
 
@@ -351,7 +389,6 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             weight: productData.weight,
             materials: productData.materials,
             tags: Array.isArray(productData.tags) ? productData.tags.join(',') : productData.tags,
-            promotion_id: productData.promotion_id || null, // Add promotion_id field
             updated_at: new Date().toISOString()
           })
           .eq('id', product.id);
@@ -359,31 +396,50 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         if (error) throw error;
         
         // Handle product images update
-        // First delete ALL existing images for this product
-        const { error: deleteImagesError } = await supabase
-          .from('product_images')
+        // First delete existing images
+        if (productData.images.length > 0) {
+          // Keep track of existing images that should remain
+          const existingImageUrls = product.images || [];
+          const newImageUrls = productData.images.filter(url => !existingImageUrls.includes(url));
+          
+          // Add new images
+          if (newImageUrls.length > 0) {
+            const imagesToInsert = newImageUrls.map((url, index) => ({
+              product_id: product.id,
+              url,
+              is_primary: index === 0 && existingImageUrls.length === 0, // First new image is primary if no existing images
+              alt_text: `${productData.name} image ${index + 1}`
+            }));
+            
+            const { error: imageError } = await supabase
+              .from('product_images')
+              .insert(imagesToInsert);
+              
+            if (imageError) {
+              console.error('Error adding product images:', imageError);
+            }
+          }
+        }
+        
+        // Update product promotions
+        // First remove all existing associations
+        await customTable('product_promotions')
           .delete()
           .eq('product_id', product.id);
           
-        if (deleteImagesError) {
-          console.error('Error deleting existing product images:', deleteImagesError);
-        }
-        
-        // Then add all current images as new entries
-        if (productData.images.length > 0) {
-          const imagesToInsert = productData.images.map((url, index) => ({
+        // Then add new associations
+        if (productData.promotions.length > 0) {
+          const promotionsToInsert = productData.promotions.map(promotionId => ({
             product_id: product.id,
-            url,
-            is_primary: index === 0, // First image is primary
-            alt_text: `${productData.name} image ${index + 1}`
+            promotion_id: promotionId,
+            created_at: new Date().toISOString()
           }));
           
-          const { error: imageError } = await supabase
-            .from('product_images')
-            .insert(imagesToInsert);
+          const { error: promotionError } = await customTable('product_promotions')
+            .insert(promotionsToInsert);
             
-          if (imageError) {
-            console.error('Error adding product images:', imageError);
+          if (promotionError) {
+            console.error('Error adding product promotions:', promotionError);
           }
         }
         
@@ -404,7 +460,6 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             materials: productData.materials,
             tags: Array.isArray(productData.tags) ? productData.tags.join(',') : productData.tags,
             seller_id: session.user.id,
-            promotion_id: productData.promotion_id || null, // Add promotion_id field for new products
           })
           .select();
           
@@ -428,6 +483,22 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               
             if (imageError) {
               console.error('Error adding product images:', imageError);
+            }
+          }
+          
+          // Add product promotions
+          if (productData.promotions.length > 0) {
+            const promotionsToInsert = productData.promotions.map(promotionId => ({
+              product_id: productId,
+              promotion_id: promotionId,
+              created_at: new Date().toISOString()
+            }));
+            
+            const { error: promotionError } = await customTable('product_promotions')
+              .insert(promotionsToInsert);
+              
+            if (promotionError) {
+              console.error('Error adding product promotions:', promotionError);
             }
           }
         }
@@ -634,25 +705,28 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
           
           {/* Promotions */}
           <div className="space-y-4">
-            <h3 className="text-sm font-medium text-muted-foreground">Applied Promotion</h3>
+            <h3 className="text-sm font-medium text-muted-foreground">Applied Promotions</h3>
             
             {promotions.length > 0 ? (
               <div className="border rounded-md p-4 space-y-3">
                 {promotions.map((promotion) => (
                   <div key={promotion.id} className="flex items-center space-x-2">
-                    <input 
-                      type="radio" 
+                    <Checkbox 
                       id={`promotion-${promotion.id}`} 
-                      name="promotion_id"
-                      value={promotion.id}
-                      checked={formData.promotion_id === promotion.id}
-                      onChange={() => {
-                        setFormData(prev => ({
-                          ...prev, 
-                          promotion_id: promotion.id
-                        }));
+                      checked={formData.promotions.includes(promotion.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setFormData(prev => ({
+                            ...prev, 
+                            promotions: [...prev.promotions, promotion.id]
+                          }));
+                        } else {
+                          setFormData(prev => ({
+                            ...prev,
+                            promotions: prev.promotions.filter(id => id !== promotion.id)
+                          }));
+                        }
                       }}
-                      className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
                     />
                     <Label 
                       htmlFor={`promotion-${promotion.id}`}
@@ -682,28 +756,6 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     </Label>
                   </div>
                 ))}
-                <div className="flex items-center space-x-2 mt-2">
-                  <input 
-                    type="radio" 
-                    id="no-promotion" 
-                    name="promotion_id"
-                    value=""
-                    checked={formData.promotion_id === ''}
-                    onChange={() => {
-                      setFormData(prev => ({
-                        ...prev, 
-                        promotion_id: ''
-                      }));
-                    }}
-                    className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
-                  />
-                  <Label 
-                    htmlFor="no-promotion"
-                    className="cursor-pointer"
-                  >
-                    No promotion (regular price)
-                  </Label>
-                </div>
               </div>
             ) : (
               <div className="border border-dashed rounded-md p-4 text-center">
@@ -824,4 +876,4 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   );
 };
 
-export default ProductFormModal;
+export default ProductFormModal; 

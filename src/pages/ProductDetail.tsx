@@ -257,6 +257,25 @@ const ProductDetail = () => {
               )}
             </div>
 
+            {/* Promotion Banner */}
+            {product.promotion && (
+              <div className="mt-2 bg-secondary/50 rounded-md p-3 border border-secondary">
+                <div className="flex items-center gap-2">
+                  {product.promotion.discount_type === 'percentage' ? (
+                    <span className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full font-medium">
+                      {product.promotion.discount_value}% OFF
+                    </span>
+                  ) : (
+                    <span className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full font-medium">
+                      ₱{product.promotion.discount_value} OFF
+                    </span>
+                  )}
+                  <span className="font-medium text-sm">{product.promotion.title}</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">{product.promotion.description}</p>
+              </div>
+            )}
+
             {/* Description */}
             <p className="text-muted-foreground">{product.description || 'No description available.'}</p>
 

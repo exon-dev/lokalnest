@@ -45,12 +45,19 @@ export type ProductDetail = {
     is_primary: boolean | null;
     alt_text: string | null;
   }[];
+  promotion?: {
+    id: string;
+    title: string;
+    description: string;
+    discount_type: 'percentage' | 'fixed';
+    discount_value: number;
+  } | null;
 };
 
 // New function to get product details by ID
 export async function getProductById(id: string): Promise<ProductDetail | null> {
   try {
-    // First fetch the product with its related data
+    // First fetch the product with its related data  
     const { data: product, error } = await supabase
       .from('products')
       .select(`
@@ -67,6 +74,7 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
         weight,
         materials,
         tags,
+        seller_id,
         categories!inner(id, name, slug),
         seller_profiles!inner(
           id, 
@@ -94,9 +102,21 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
     const { count: productCount, error: countError } = await supabase
       .from('products')
       .select('id', { count: 'exact', head: true })
-      .eq('seller_id', product.seller_profiles.id);
+      .eq('seller_id', product.seller_id);
 
     if (countError) throw countError;
+
+    // Fetch promotion data if available
+    let promotionData = null;
+    // Check for promotions related to this product
+    const { data: promotions, error: promotionError } = await (supabase
+      .from('promotions' as any)
+      .select('id, title, description, discount_type, discount_value')
+      .eq('product_id', id)) as any;
+      
+    if (!promotionError && promotions && promotions.length > 0) {
+      promotionData = promotions[0];
+    }
 
     // Format the data to match our expected structure
     return {
@@ -126,7 +146,8 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
         rating: 4.9, // Placeholder until we implement seller ratings
         product_count: productCount || 0
       },
-      images: images || []
+      images: images || [],
+      promotion: promotionData
     };
   } catch (error) {
     console.error('Error fetching product details:', error);

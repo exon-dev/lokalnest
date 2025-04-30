@@ -282,7 +282,7 @@ const Checkout: React.FC = () => {
     }
   };
   
-  const shippingFee = 150;
+  const shippingFee = 50;
   const totalWithShipping = totalPrice + shippingFee;
 
   if (items.length === 0) {
