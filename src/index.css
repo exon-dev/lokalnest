@@ -64,6 +64,31 @@
     --input: 217 33% 17%;
     --ring: 212.7 26.8% 83.9%;
   }
+
+  /* Fix for chart text visibility in dark mode */
+  .dark .recharts-text {
+    fill: #ffffff !important; /* White text in dark mode */
+  }
+  
+  .dark .recharts-legend-item-text {
+    color: #ffffff !important; /* White legend text in dark mode */
+  }
+
+  .dark .recharts-tooltip-item-name,
+  .dark .recharts-tooltip-item-value {
+    color: #ffffff !important;
+  }
+
+  .dark .recharts-default-tooltip {
+    background-color: #1f2937 !important;
+    border-color: #374151 !important;
+  }
+  
+  /* Make grid lines more visible in dark mode */
+  .dark .recharts-cartesian-grid-horizontal line,
+  .dark .recharts-cartesian-grid-vertical line {
+    stroke: rgba(255, 255, 255, 0.2) !important;
+  }
 }
 
 @layer base {

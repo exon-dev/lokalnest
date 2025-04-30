@@ -141,9 +141,26 @@ const SellerSettings = () => {
       if (!session) throw new Error('Not authenticated');
       
       const fileExt = logoFile.name.split('.').pop();
-      const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
+      const userId = session.user.id;
+      // Create folder structure with user ID for better organization
+      const fileName = `${userId}/${Date.now()}.${fileExt}`;
       
-      // Upload to Supabase Storage (store_logos bucket should exist from StoreManagement)
+      // Try to create bucket first (will do nothing if it already exists)
+      try {
+        await supabase.storage.createBucket('store_logos', {
+          public: true
+        });
+        console.log('Created store_logos bucket or it already exists');
+      } catch (bucketError: any) {
+        // Ignore "bucket already exists" errors
+        if (!bucketError.message?.includes('already exists')) {
+          console.warn('Bucket creation warning:', bucketError);
+        }
+      }
+      
+      console.log(`Uploading logo to store_logos/${fileName}`);
+      
+      // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('store_logos')
         .upload(fileName, logoFile, {
@@ -151,17 +168,28 @@ const SellerSettings = () => {
           upsert: true
         });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Storage upload error:', error);
+        throw error;
+      }
+      
+      if (!data || !data.path) {
+        console.error('No data or path returned from upload');
+        throw new Error('Upload failed - no path returned');
+      }
+      
+      console.log('Upload successful, path:', data.path);
       
       // Get the public URL
       const { data: { publicUrl } } = supabase.storage
         .from('store_logos')
         .getPublicUrl(data.path);
-        
+      
+      console.log('Generated public URL:', publicUrl);
       return publicUrl;
     } catch (error) {
       console.error('Error uploading logo:', error);
-      toast.error('Failed to upload logo');
+      toast.error('Error uploading logo: ' + (error instanceof Error ? error.message : 'Unknown error'));
       return null;
     }
   };

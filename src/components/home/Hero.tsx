@@ -74,28 +74,28 @@ const Hero = () => {
             <div className="grid grid-cols-2 gap-4 max-w-lg">
               {/* Featured Product Cards */}
               <div className="transform -rotate-6 translate-x-4 translate-y-8">
-                <div className="bg-white rounded-lg shadow-xl overflow-hidden">
+                <div className="bg-card dark:bg-card rounded-lg shadow-xl overflow-hidden">
                   <img
                     src="https://images.unsplash.com/photo-1489987707025-afc232f7ea0f"
                     alt="Handwoven Textiles"
                     className="w-full h-48 object-cover"
                   />
                   <div className="p-4">
-                    <h3 className="font-semibold text-gray-800">Traditional Textiles</h3>
-                    <p className="text-sm text-gray-600">Handwoven by local artisans</p>
+                    <h3 className="font-semibold text-card-foreground dark:text-card-foreground">Traditional Textiles</h3>
+                    <p className="text-sm text-muted-foreground">Handwoven by local artisans</p>
                   </div>
                 </div>
               </div>
               <div className="transform rotate-6 -translate-x-4">
-                <div className="bg-white rounded-lg shadow-xl overflow-hidden">
+                <div className="bg-card dark:bg-card rounded-lg shadow-xl overflow-hidden">
                   <img
                     src="https://images.unsplash.com/photo-1611486212557-88be5ff6f941"
                     alt="Wooden Crafts"
                     className="w-full h-48 object-cover"
                   />
                   <div className="p-4">
-                    <h3 className="font-semibold text-gray-800">Wooden Crafts</h3>
-                    <p className="text-sm text-gray-600">Expertly crafted woodwork</p>
+                    <h3 className="font-semibold text-card-foreground dark:text-card-foreground">Wooden Crafts</h3>
+                    <p className="text-sm text-muted-foreground">Expertly crafted woodwork</p>
                   </div>
                 </div>
               </div>

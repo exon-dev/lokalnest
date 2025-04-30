@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/components/buyer/shopping/Cart';
 import { getProductById, ProductDetail as ProductDetailType } from '@/services/productService';
+import { supabase } from '@/integrations/supabase/client';
 
 // Default delivery options for all products
 const deliveryOptions = [
@@ -34,6 +35,8 @@ const ProductDetail = () => {
   const [mainImage, setMainImage] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
+  const [sellerRating, setSellerRating] = useState<number | null>(null);
+  const [sellerReviewCount, setSellerReviewCount] = useState(0);
   const { addItem } = useCart();
 
   useEffect(() => {
@@ -59,6 +62,11 @@ const ProductDetail = () => {
           const primaryImage = productData.images.find(img => img.is_primary);
           setMainImage(primaryImage ? primaryImage.url : productData.images[0].url);
         }
+        
+        // After we have the product data, get the seller's average rating
+        if (productData.seller && productData.seller.id) {
+          fetchSellerRating(productData.seller.id);
+        }
       } catch (error) {
         console.error('Error loading product:', error);
         toast.error('Failed to load product details');
@@ -69,6 +77,40 @@ const ProductDetail = () => {
 
     loadProduct();
   }, [id, navigate]);
+  
+  // Fetch the seller's average rating from reviews
+  const fetchSellerRating = async (sellerId: string) => {
+    try {
+      // First get all products from this seller
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id')
+        .eq('seller_id', sellerId);
+      
+      if (productsError) throw productsError;
+      if (!products || products.length === 0) return;
+      
+      const productIds = products.map(p => p.id);
+      
+      // Get reviews for these products
+      const { data: reviews, error: reviewsError } = await supabase
+        .from('reviews')
+        .select('rating')
+        .in('product_id', productIds);
+        
+      if (reviewsError) throw reviewsError;
+      
+      // Calculate average rating
+      if (reviews && reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
+        const avgRating = totalRating / reviews.length;
+        setSellerRating(parseFloat(avgRating.toFixed(1)));
+        setSellerReviewCount(reviews.length);
+      }
+    } catch (error) {
+      console.error('Error fetching seller rating:', error);
+    }
+  };
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -357,7 +399,7 @@ const ProductDetail = () => {
                   <h3 className="font-medium">{product.seller.business_name}</h3>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Star className="h-3 w-3 text-yellow-500 fill-yellow-500 mr-1" />
-                    <span>{product.seller.rating || '5.0'} • {product.seller.product_count} products</span>
+                    <span>{sellerRating || 'No Rating'} • {sellerReviewCount} reviews</span>
                   </div>
                 </div>
                 <Link to={`/artisan/${product.seller.id}`}>

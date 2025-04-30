@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Paintbrush, Gem, ThumbsUp, HeartHandshake } from 'lucide-react';
 
@@ -27,7 +26,7 @@ const features = [
 
 const Features = () => {
   return (
-    <section className="py-16 bg-white">
+    <section className="py-16 bg-background">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-3">Why Shop With Us</h2>
@@ -40,7 +39,7 @@ const Features = () => {
           {features.map((feature, index) => (
             <div 
               key={index}
-              className="flex flex-col items-center text-center p-6 bg-white rounded-lg border border-border"
+              className="flex flex-col items-center text-center p-6 bg-card dark:bg-card text-card-foreground dark:text-card-foreground rounded-lg border border-border"
             >
               <div className="p-3 rounded-full bg-blue-light/10 mb-4">
                 {feature.icon}

@@ -244,6 +244,7 @@ const Navbar = () => {
         <div className="hidden md:flex items-center space-x-8">
           <NavigationMenu>
             <NavigationMenuList>
+              {/* Commented out Categories menu
               <NavigationMenuItem>
                 <NavigationMenuTrigger className="text-sm font-medium">
                   Categories
@@ -267,16 +268,21 @@ const Navbar = () => {
                   </ul>
                 </NavigationMenuContent>
               </NavigationMenuItem>
+              */}
+              {/* Commented out Artisans link
               <NavigationMenuItem>
                 <Link to="/artisans" className="flex items-center gap-1 text-sm font-medium">
                   Artisans
                 </Link>
               </NavigationMenuItem>
+              */}
+              {/* Commented out About link
               <NavigationMenuItem>
                 <Link to="/about" className="flex items-center gap-1 text-sm font-medium">
                   About
                 </Link>
               </NavigationMenuItem>
+              */}
             </NavigationMenuList>
           </NavigationMenu>
         </div>
@@ -327,10 +333,13 @@ const Navbar = () => {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate('/profile')}>
-                  <User className="mr-2 h-4 w-4" />
-                  Profile
-                </DropdownMenuItem>
+                {/* Show Profile only for buyers, not for sellers */}
+                {(isBuyer || user?.user_metadata?.account_type !== 'seller') && (
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                )}
                 {/* Show Orders only for buyers or users who aren't explicitly sellers */}
                 {(isBuyer || user?.user_metadata?.account_type !== 'seller') && (
                   <DropdownMenuItem onClick={() => navigate('/buyer/orders')}>

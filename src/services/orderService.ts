@@ -28,6 +28,7 @@ export interface Order {
   payment_status?: string;
   estimated_delivery?: string;
   tracking_number?: string;
+  delivery_option?: string;
 }
 
 // Get orders for the current user (as a buyer)

@@ -17,20 +17,64 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from 'sonner';
-import { ChevronLeft, RefreshCw } from 'lucide-react';
+import { ChevronLeft, RefreshCw, Truck, Clock, Calendar } from 'lucide-react';
 import { stripePromise, createPaymentIntent } from '@/services/stripeService';
 import { createOrder } from '@/services/orderService';
 import { getDefaultAddress, getUserProfile } from '@/services/userService';
 import StripeCardElement from '@/components/checkout/StripeCardElement';
+import { addBusinessDays, format } from 'date-fns';
 
 const Checkout: React.FC = () => {
-  const { items, totalPrice, clearCart } = useCart();
+  const { selectedItems, selectedItemsTotal, clearCart } = useCart();
   const navigate = useNavigate();
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'cod'>('stripe');
   const [isProcessing, setIsProcessing] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [loadingAddress, setLoadingAddress] = useState(true);
+  const [selectedDeliveryOption, setSelectedDeliveryOption] = useState<string>('standard');
+  
+  // Define delivery options with business days for estimated delivery
+  const deliveryOptions = [
+    { 
+      id: 'standard', 
+      name: 'Standard Delivery', 
+      description: '3-5 business days', 
+      fee: 50,
+      minDays: 3,
+      maxDays: 5
+    },
+    { 
+      id: 'express', 
+      name: 'Express Delivery', 
+      description: '1-2 business days', 
+      fee: 100,
+      minDays: 1,
+      maxDays: 2
+    },
+    { 
+      id: 'maxim', 
+      name: 'Maxim Same-day', 
+      description: 'Same day delivery', 
+      fee: 150,
+      minDays: 0,
+      maxDays: 1
+    }
+  ];
+  
+  // Get selected delivery option
+  const selectedDeliveryFee = deliveryOptions.find(option => option.id === selectedDeliveryOption)?.fee || 50;
+  const selectedDeliveryDetails = deliveryOptions.find(option => option.id === selectedDeliveryOption);
+  
+  // Calculate estimated delivery date
+  const calculateEstimatedDelivery = () => {
+    if (!selectedDeliveryDetails) return null;
+    
+    const today = new Date();
+    // Use the maximum days for a safe estimate
+    const estimatedDate = addBusinessDays(today, selectedDeliveryDetails.maxDays);
+    return estimatedDate.toISOString();
+  };
   
   const [shippingInfo, setShippingInfo] = useState({
     fullName: '',
@@ -41,12 +85,13 @@ const Checkout: React.FC = () => {
     phone: ''
   });
 
-  // If cart is empty, redirect to home
+  // If no items are selected, redirect to home
   useEffect(() => {
-    if (items.length === 0) {
+    if (selectedItems.length === 0) {
+      toast.error('No items selected for checkout');
       navigate('/');
     }
-  }, [items, navigate]);
+  }, [selectedItems, navigate]);
 
   // Fetch user's shipping information from Supabase
   useEffect(() => {
@@ -90,16 +135,15 @@ const Checkout: React.FC = () => {
 
   // Initialize Stripe payment intent when payment method is set to stripe
   useEffect(() => {
-    if (paymentMethod === 'stripe' && items.length > 0 && !clientSecret) {
+    if (paymentMethod === 'stripe' && selectedItems.length > 0 && !clientSecret) {
       const fetchPaymentIntent = async () => {
         try {
           // Get the sellerId from the first item (assuming all items are from the same seller)
-          // In a real app, you might need to handle multiple sellers
-          const sellerId = items[0]?.seller || null;
+          const sellerId = selectedItems[0]?.seller || null;
           
           console.log('Creating payment intent for seller:', sellerId);
           // Create payment intent will work regardless of whether user has a seller profile or not
-          const { clientSecret, paymentIntentId } = await createPaymentIntent(items, sellerId);
+          const { clientSecret, paymentIntentId } = await createPaymentIntent(selectedItems, sellerId);
           setClientSecret(clientSecret);
           setPaymentIntentId(paymentIntentId);
         } catch (error) {
@@ -110,7 +154,7 @@ const Checkout: React.FC = () => {
 
       fetchPaymentIntent();
     }
-  }, [paymentMethod, items, clientSecret]);
+  }, [paymentMethod, selectedItems, clientSecret]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -142,20 +186,25 @@ const Checkout: React.FC = () => {
       const formattedAddress = `${shippingInfo.fullName}, ${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.province} ${shippingInfo.postalCode}, Phone: ${shippingInfo.phone}`;
       
       // Check that we have items in the cart
-      if (!items || items.length === 0) {
-        toast.error('Your cart is empty');
+      if (!selectedItems || selectedItems.length === 0) {
+        toast.error('No items selected for checkout');
         setIsProcessing(false);
         return;
       }
 
+      // Calculate estimated delivery date
+      const estimatedDelivery = calculateEstimatedDelivery();
+
       console.log('Placing order with:', { 
-        items: items.length,
+        items: selectedItems.length,
         paymentMethod,
-        address: formattedAddress
+        address: formattedAddress,
+        deliveryOption: selectedDeliveryOption,
+        estimatedDelivery
       });
       
       // Get the seller ID from the first item (assuming all items are from the same seller)
-      const sellerId = items[0]?.seller || null;
+      const sellerId = selectedItems[0]?.seller || null;
       
       // Prepare order data object with all required fields
       const orderData = {
@@ -163,14 +212,16 @@ const Checkout: React.FC = () => {
         shipping_address: formattedAddress,
         billing_address: formattedAddress,
         payment_method: paymentMethod,
-        total_amount: totalWithShipping
+        total_amount: totalWithShipping,
+        delivery_option: selectedDeliveryOption,
+        estimated_delivery: estimatedDelivery
       };
       
       if (paymentMethod === 'cod') {
         // Process COD order
         console.log('Processing COD order...');
         try {
-          const orderId = await createOrder(orderData, items);
+          const orderId = await createOrder(orderData, selectedItems);
           
           console.log('COD order created successfully:', orderId);
           toast.success('Order placed successfully!');
@@ -190,7 +241,7 @@ const Checkout: React.FC = () => {
             payment_intent_id: paymentIntentId
           };
           
-          const orderId = await createOrder(stripeOrderData, items);
+          const orderId = await createOrder(stripeOrderData, selectedItems);
           
           // We'll update the order status when the payment succeeds
           // This is handled in the onPaymentSuccess callback
@@ -213,7 +264,10 @@ const Checkout: React.FC = () => {
       const formattedAddress = `${shippingInfo.fullName}, ${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.province} ${shippingInfo.postalCode}, Phone: ${shippingInfo.phone}`;
       
       // Get the seller ID from the first item
-      const sellerId = items[0]?.seller || null;
+      const sellerId = selectedItems[0]?.seller || null;
+      
+      // Calculate estimated delivery date
+      const estimatedDelivery = calculateEstimatedDelivery();
       
       // Create proper order data
       const orderData = {
@@ -223,11 +277,13 @@ const Checkout: React.FC = () => {
         payment_method: 'stripe',
         payment_intent_id: completedPaymentIntentId,
         payment_status: 'succeeded',
-        total_amount: totalWithShipping
+        total_amount: totalWithShipping,
+        delivery_option: selectedDeliveryOption,
+        estimated_delivery: estimatedDelivery
       };
       
       // Create the order with the completed payment intent ID
-      const orderId = await createOrder(orderData, items);
+      const orderId = await createOrder(orderData, selectedItems);
       
       // The order has been created and the payment has been processed
       toast.success('Payment successful! Your order has been placed.');
@@ -271,10 +327,15 @@ const Checkout: React.FC = () => {
     }
   };
   
-  const shippingFee = 50;
-  const totalWithShipping = totalPrice + shippingFee;
+  const totalWithShipping = selectedItemsTotal + selectedDeliveryFee;
 
-  if (items.length === 0) {
+  // Format estimated delivery date for display
+  const getFormattedEstimatedDelivery = () => {
+    const estimatedDate = calculateEstimatedDelivery();
+    return estimatedDate ? format(new Date(estimatedDate), 'MMMM d, yyyy') : 'Unknown';
+  };
+
+  if (selectedItems.length === 0) {
     return null; // Don't render anything while redirecting
   }
 
@@ -397,6 +458,44 @@ const Checkout: React.FC = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Delivery Options */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Delivery Options</CardTitle>
+                <CardDescription>
+                  Choose your preferred delivery method
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup 
+                  value={selectedDeliveryOption} 
+                  onValueChange={setSelectedDeliveryOption}
+                  className="space-y-3"
+                >
+                  {deliveryOptions.map(option => (
+                    <div key={option.id} className="flex items-center space-x-2 border rounded-md p-4 cursor-pointer">
+                      <RadioGroupItem value={option.id} id={`delivery-${option.id}`} />
+                      <Label htmlFor={`delivery-${option.id}`} className="flex-1 cursor-pointer">
+                        <div className="font-medium flex items-center">
+                          <Truck className="h-4 w-4 mr-2" /> {option.name}
+                        </div>
+                        <div className="text-sm text-muted-foreground flex items-center mt-1">
+                          <Clock className="h-3 w-3 mr-1" /> {option.description}
+                        </div>
+                        <div className="text-sm text-muted-foreground flex items-center mt-1">
+                          <Calendar className="h-3 w-3 mr-1" /> 
+                          {option.id === selectedDeliveryOption && (
+                            <span>Estimated delivery: {getFormattedEstimatedDelivery()}</span>
+                          )}
+                        </div>
+                      </Label>
+                      <div className="font-medium">₱{option.fee.toLocaleString()}</div>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </CardContent>
+            </Card>
             
             {/* Payment Method */}
             <Card>
@@ -461,7 +560,7 @@ const Checkout: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  {items.map(item => (
+                  {selectedItems.map(item => (
                     <div key={item.id} className="flex justify-between">
                       <span className="text-muted-foreground flex-1">
                         {item.quantity} x {item.name.length > 20 
@@ -478,17 +577,21 @@ const Checkout: React.FC = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span>₱{totalPrice.toLocaleString()}</span>
+                    <span>₱{selectedItemsTotal.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Shipping Fee</span>
-                    <span>₱{shippingFee.toLocaleString()}</span>
+                    <span>Shipping Fee ({deliveryOptions.find(o => o.id === selectedDeliveryOption)?.name})</span>
+                    <span>₱{selectedDeliveryFee.toLocaleString()}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-medium text-lg">
                     <span>Total</span>
                     <span>₱{totalWithShipping.toLocaleString()}</span>
                   </div>
+                </div>
+                <div className="text-sm text-muted-foreground flex items-center mt-2">
+                  <Calendar className="h-4 w-4 mr-2" /> 
+                  Estimated delivery: {getFormattedEstimatedDelivery()}
                 </div>
               </CardContent>
               <CardFooter>

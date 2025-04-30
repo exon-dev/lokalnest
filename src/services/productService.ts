@@ -67,8 +67,6 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
         price,
         sale_price,
         stock_quantity,
-        rating,
-        review_count,
         shipping_info,
         dimensions,
         weight,
@@ -105,6 +103,24 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
       .eq('seller_id', product.seller_id);
 
     if (countError) throw countError;
+    
+    // Fetch product ratings and reviews
+    const { data: reviews, error: reviewsError } = await supabase
+      .from('reviews')
+      .select('rating')
+      .eq('product_id', id);
+      
+    if (reviewsError) throw reviewsError;
+    
+    // Calculate average rating and count reviews
+    let avgRating = null;
+    let reviewCount = 0;
+    
+    if (reviews && reviews.length > 0) {
+      const totalRating = reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
+      avgRating = parseFloat((totalRating / reviews.length).toFixed(1));
+      reviewCount = reviews.length;
+    }
 
     // Fetch promotion data if available
     let promotionData = null;
@@ -126,8 +142,8 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
       price: product.price,
       sale_price: product.sale_price,
       stock_quantity: product.stock_quantity,
-      rating: product.rating,
-      review_count: product.review_count,
+      rating: avgRating,
+      review_count: reviewCount,
       shipping_info: product.shipping_info,
       dimensions: product.dimensions,
       weight: product.weight,
@@ -143,7 +159,7 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
         business_name: product.seller_profiles.business_name,
         logo_url: product.seller_profiles.logo_url,
         location: product.seller_profiles.location,
-        rating: 4.9, // Placeholder until we implement seller ratings
+        rating: null, // Will be set by the component that calls this
         product_count: productCount || 0
       },
       images: images || [],

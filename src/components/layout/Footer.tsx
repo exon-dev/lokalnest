@@ -17,23 +17,23 @@ const Footer = () => {
               Connecting you directly with local producers, farmers, and artisans to bring the freshest products to your table.
             </p>
             <div className="space-y-3">
-              {/* <div className="flex items-start">
+              <div className="flex items-start">
                 <MapPin className="h-5 w-5 text-muted-foreground mr-3 mt-0.5" />
                 <p className="text-sm text-muted-foreground">
-                  123 Market Street, Suite 456<br />
-                  Metro Manila, Philippines
+                  Rudy Tiu Bldg. II, J.C. Aquino Avenue<br />
+                  Butuan City, Philippines
                 </p>
-              </div> */}
+              </div>
               <div className="flex items-center">
                 <Mail className="h-5 w-5 text-muted-foreground mr-3" />
                 <a href="mailto:support@localnook.com" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  support@localnook.com
+                  caraga.agusandelnorte@dti.gov.ph
                 </a>
               </div>
               <div className="flex items-center">
                 <Phone className="h-5 w-5 text-muted-foreground mr-3" />
                 <a href="tel:+63-2-8123-4567" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  +63 (2) 8123 4567
+                  (085) 341 5221
                 </a>
               </div>
             </div>

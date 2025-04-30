@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -13,7 +13,8 @@ import {
   Instagram, 
   Star, 
   Loader2,
-  MessageSquare
+  MessageSquare,
+  ArrowLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getSellerProfile, getSellerProducts, SellerProfile as BaseSellerProfile } from '@/services/sellerService';
@@ -43,11 +44,14 @@ type Product = {
 
 const SellerProfilePage = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [seller, setSeller] = useState<SellerProfile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [isMessagingOpen, setIsMessagingOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [sellerRating, setSellerRating] = useState<number | null>(null);
+  const [reviewCount, setReviewCount] = useState(0);
 
   useEffect(() => {
     async function loadSellerData() {
@@ -62,6 +66,8 @@ const SellerProfilePage = () => {
         
         if (sellerData) {
           setSeller(sellerData);
+          // Fetch seller ratings once we have the seller data
+          fetchSellerRating(id);
         } else {
           toast.error("Seller profile not found");
         }
@@ -85,6 +91,40 @@ const SellerProfilePage = () => {
     
     checkAuth();
   }, [id]);
+  
+  // Fetch the seller's average rating from reviews
+  const fetchSellerRating = async (sellerId: string) => {
+    try {
+      // First get all products from this seller
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id')
+        .eq('seller_id', sellerId);
+      
+      if (productsError) throw productsError;
+      if (!products || products.length === 0) return;
+      
+      const productIds = products.map(p => p.id);
+      
+      // Get reviews for these products
+      const { data: reviews, error: reviewsError } = await supabase
+        .from('reviews')
+        .select('rating')
+        .in('product_id', productIds);
+        
+      if (reviewsError) throw reviewsError;
+      
+      // Calculate average rating
+      if (reviews && reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
+        const avgRating = totalRating / reviews.length;
+        setSellerRating(parseFloat(avgRating.toFixed(1)));
+        setReviewCount(reviews.length);
+      }
+    } catch (error) {
+      console.error('Error fetching seller rating:', error);
+    }
+  };
   
   const handleMessageSeller = () => {
     if (!isLoggedIn) {
@@ -126,6 +166,20 @@ const SellerProfilePage = () => {
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8 mt-16">
+        {/* Back button */}
+        <div className="mb-6">
+          <Button 
+            onClick={() => navigate('/buyer/home')} 
+            variant="ghost" 
+            className="group flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors pl-2 pr-4"
+          >
+            <div className="bg-primary-foreground rounded-full p-1 mr-1 transition-transform group-hover:-translate-x-0.5">
+              <ArrowLeft className="h-4 w-4 text-primary" />
+            </div>
+            <span>Back to Marketplace</span>
+          </Button>
+        </div>
+
         {/* Profile header */}
         <div className="bg-white border rounded-lg shadow-sm p-6 mb-8">
           <div className="flex flex-col md:flex-row gap-6">
@@ -150,7 +204,7 @@ const SellerProfilePage = () => {
               </div>
               <div className="flex items-center mt-1 text-sm text-muted-foreground">
                 <Star className="h-4 w-4 text-yellow-500 fill-yellow-500 mr-1" />
-                <span>4.9 • {products.length} products</span>
+                <span>{sellerRating ? `${sellerRating} • ${reviewCount} reviews` : 'No ratings yet'}</span>
                 {seller.location && (
                   <>
                     <span className="mx-2">•</span>

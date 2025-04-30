@@ -19,6 +19,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getCurrentSellerProfile } from '@/services/sellerService';
 
 type NavItem = {
   title: string;
@@ -44,6 +45,22 @@ const SellerSidebar: React.FC<SellerSidebarProps> = ({ user }) => {
   const [isVerified, setIsVerified] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [unreadMessageCount, setUnreadMessageCount] = useState<number>(0);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Fetch the seller profile to get the logo URL
+    const fetchSellerProfile = async () => {
+      if (user?.id) {
+        const profile = await getCurrentSellerProfile();
+        if (profile && profile.logo_url) {
+          console.log('Found logo URL:', profile.logo_url);
+          setLogoUrl(profile.logo_url);
+        }
+      }
+    };
+    
+    fetchSellerProfile();
+  }, [user?.id]);
 
   // Check verification status directly from seller_verifications table
   useEffect(() => {
@@ -132,6 +149,34 @@ const SellerSidebar: React.FC<SellerSidebarProps> = ({ user }) => {
     }
   };
 
+  // Create a real-time subscription for logo updates
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const channel = supabase
+      .channel('seller-profile-updates')
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'seller_profiles',
+          filter: `id=eq.${user.id}`
+        },
+        (payload) => {
+          // When profile updates, check for logo_url changes
+          if (payload.new && payload.new.logo_url) {
+            console.log('Profile updated with new logo:', payload.new.logo_url);
+            setLogoUrl(payload.new.logo_url);
+          }
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [user?.id]);
+
   const navItems: NavItem[] = [
     {
       title: 'Overview',
@@ -196,8 +241,11 @@ const SellerSidebar: React.FC<SellerSidebarProps> = ({ user }) => {
         <div className="px-4 py-2 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback>{user.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+              {logoUrl ? (
+                <AvatarImage src={logoUrl} alt={user.name} />
+              ) : (
+                <AvatarFallback>{user.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+              )}
             </Avatar>
             <div>
               <h2 className="text-sm font-semibold text-foreground">{user.name}</h2>

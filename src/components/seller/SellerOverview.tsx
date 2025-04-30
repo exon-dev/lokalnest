@@ -700,7 +700,7 @@ const SellerOverview = () => {
                     align="center"
                     verticalAlign="bottom"
                     formatter={(value, entry, index) => (
-                      <span style={{ color: "#333", fontSize: "0.875rem", padding: "0 5px" }}>
+                      <span className="dark:text-white text-gray-800" style={{ fontSize: "0.875rem", padding: "0 5px" }}>
                         {value} ({categoryData[index]?.value || 0} products)
                       </span>
                     )}

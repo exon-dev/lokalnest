@@ -72,6 +72,9 @@ interface Order {
   payment_status: string;
   payment_method: string;
   shipping_address: string;
+  delivery_option?: string;
+  estimated_delivery?: string;
+  shipping_fee?: number; // Adding shipping fee field
 }
 
 const OrderManagement = () => {
@@ -103,7 +106,7 @@ const OrderManagement = () => {
       // Direct approach: Query orders by seller_id
       const { data: orderDetails, error: orderError } = await supabase
         .from('orders')
-        .select('id, created_at, buyer_id, total_amount, status, payment_status, payment_method, shipping_address')
+        .select('id, created_at, buyer_id, total_amount, status, payment_status, payment_method, shipping_address, estimated_delivery')
         .eq('seller_id', session.user.id);
         
       if (orderError) throw orderError;
@@ -184,6 +187,9 @@ const OrderManagement = () => {
             };
           });
           
+        const itemsSubtotal = items.reduce((sum, item) => sum + item.total_price, 0);
+        const shippingFee = Math.max(0, order.total_amount - itemsSubtotal);
+        
         return {
           id: order.id,
           date: order.created_at,
@@ -194,7 +200,10 @@ const OrderManagement = () => {
           status: order.status,
           payment_status: order.payment_status,
           payment_method: order.payment_method,
-          shipping_address: order.shipping_address
+          shipping_address: order.shipping_address,
+          delivery_option: 'standard',
+          estimated_delivery: order.estimated_delivery,
+          shipping_fee: shippingFee
         };
       });
       
@@ -636,6 +645,15 @@ const OrderManagement = () => {
                     <p><strong>Status:</strong> {selectedOrder.status}</p>
                     <p><strong>Payment Method:</strong> {selectedOrder.payment_method}</p>
                     <p><strong>Payment Status:</strong> {selectedOrder.payment_status}</p>
+                    {selectedOrder.delivery_option && (
+                      <p><strong>Delivery Option:</strong> {selectedOrder.delivery_option}</p>
+                    )}
+                    {selectedOrder.estimated_delivery && (
+                      <p><strong>Estimated Delivery:</strong> {formatFullDate(selectedOrder.estimated_delivery)}</p>
+                    )}
+                    {selectedOrder.shipping_fee !== undefined && (
+                      <p><strong>Shipping Fee:</strong> ₱{selectedOrder.shipping_fee.toFixed(2)}</p>
+                    )}
                   </div>
                 </div>
                 
@@ -643,7 +661,9 @@ const OrderManagement = () => {
                   <h3 className="text-sm font-medium text-muted-foreground">Customer Information</h3>
                   <div className="bg-muted/50 p-3 rounded-md">
                     <p><strong>Name:</strong> {selectedOrder.buyer_name}</p>
-                    <p><strong>Shipping Address:</strong> {selectedOrder.shipping_address}</p>
+                    <p><strong>Shipping Address:</strong> {selectedOrder.shipping_address.split(', Phone:')[0]}</p>
+                    <p><strong>Phone:</strong> {selectedOrder.shipping_address.includes('Phone:') ? 
+                      selectedOrder.shipping_address.split('Phone:')[1].trim() : 'Not provided'}</p>
                   </div>
                 </div>
               </div>
@@ -686,6 +706,21 @@ const OrderManagement = () => {
                           <TableCell className="text-right">₱{item.total_price.toFixed(2)}</TableCell>
                         </TableRow>
                       ))}
+                      {/* Calculate subtotal */}
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-right font-medium">Items Subtotal</TableCell>
+                        <TableCell className="text-right font-medium">
+                          ₱{selectedOrder.items.reduce((sum, item) => sum + item.total_price, 0).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                      {/* Shipping Fee */}
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-right font-medium">Shipping Fee</TableCell>
+                        <TableCell className="text-right font-medium">
+                          ₱{(selectedOrder.shipping_fee || 0).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                      {/* Order Total */}
                       <TableRow>
                         <TableCell colSpan={3} className="text-right font-medium">Order Total</TableCell>
                         <TableCell className="text-right font-bold">₱{selectedOrder.total.toFixed(2)}</TableCell>

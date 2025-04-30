@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
@@ -20,7 +19,7 @@ interface ProducerSpotlightProps {
 
 const ProducerSpotlight: React.FC<ProducerSpotlightProps> = ({ producers }) => {
   return (
-    <section className="py-16 bg-marketplace-50">
+    <section className="py-16 bg-background dark:bg-background">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-3">Meet Our Artisans</h2>
@@ -35,8 +34,8 @@ const ProducerSpotlight: React.FC<ProducerSpotlightProps> = ({ producers }) => {
               key={producer.id}
               to={`/artisan/${producer.id}`}
               className={cn(
-                "group bg-white rounded-lg overflow-hidden border border-border",
-                "hover:border-gray-300 hover:shadow-elevation-2 transition-all duration-300"
+                "group bg-card dark:bg-card text-card-foreground dark:text-card-foreground rounded-lg overflow-hidden border border-border",
+                "hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-elevation-2 transition-all duration-300"
               )}
             >
               <div className="aspect-[3/2] overflow-hidden relative">

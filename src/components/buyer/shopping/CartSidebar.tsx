@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingCart, Trash2, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCart } from './Cart';
 
 interface CartSidebarProps {
@@ -21,12 +22,27 @@ interface CartSidebarProps {
 }
 
 const CartSidebar: React.FC<CartSidebarProps> = ({ children }) => {
-  const { items, totalItems, totalPrice, removeItem, updateQuantity, isCartOpen, setIsCartOpen } = useCart();
+  const { 
+    items, 
+    totalItems, 
+    totalPrice, 
+    removeItem, 
+    updateQuantity, 
+    toggleItemSelection, 
+    toggleAllSelection,
+    selectedItemsCount,
+    selectedItemsTotal,
+    isCartOpen, 
+    setIsCartOpen 
+  } = useCart();
   const navigate = useNavigate();
   
   const handleCheckout = () => {
     navigate('/checkout');
   };
+
+  const allSelected = items.length > 0 && items.every(item => item.selected);
+  const someSelected = selectedItemsCount > 0;
 
   return (
     <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
@@ -67,8 +83,32 @@ const CartSidebar: React.FC<CartSidebarProps> = ({ children }) => {
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Select All */}
+              <div className="flex items-center mb-2">
+                <Checkbox 
+                  id="select-all" 
+                  className="mr-2"
+                  checked={allSelected}
+                  onCheckedChange={(checked) => toggleAllSelection(!!checked)}
+                />
+                <label htmlFor="select-all" className="text-sm font-medium">
+                  Select All Items
+                </label>
+                <div className="flex-1"></div>
+                <span className="text-sm text-muted-foreground">
+                  {selectedItemsCount} of {totalItems} selected
+                </span>
+              </div>
+
               {items.map((item) => (
                 <div key={item.id} className="flex border-b pb-4">
+                  <div className="flex items-center mr-2">
+                    <Checkbox 
+                      id={`item-${item.id}`}
+                      checked={item.selected}
+                      onCheckedChange={() => toggleItemSelection(item.id)}
+                    />
+                  </div>
                   <div className="h-20 w-20 rounded-md overflow-hidden flex-shrink-0">
                     <img 
                       src={item.image} 
@@ -126,8 +166,12 @@ const CartSidebar: React.FC<CartSidebarProps> = ({ children }) => {
             <Separator />
             <div className="space-y-2">
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Selected Items</span>
+                <span>{selectedItemsCount} item{selectedItemsCount !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>₱{totalPrice.toLocaleString()}</span>
+                <span>₱{someSelected ? selectedItemsTotal.toLocaleString() : '0'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Shipping</span>
@@ -135,7 +179,7 @@ const CartSidebar: React.FC<CartSidebarProps> = ({ children }) => {
               </div>
               <div className="flex justify-between font-medium text-lg">
                 <span>Total</span>
-                <span>₱{totalPrice.toLocaleString()}</span>
+                <span>₱{someSelected ? selectedItemsTotal.toLocaleString() : '0'}</span>
               </div>
             </div>
             
@@ -146,11 +190,15 @@ const CartSidebar: React.FC<CartSidebarProps> = ({ children }) => {
                 </Button>
               </SheetClose>
               <SheetClose asChild>
-                <Button onClick={() => {
-                  handleCheckout();
-                  setIsCartOpen(false);
-                }} className="sm:flex-1">
-                  Checkout
+                <Button 
+                  onClick={() => {
+                    handleCheckout();
+                    setIsCartOpen(false);
+                  }} 
+                  className="sm:flex-1"
+                  disabled={!someSelected}
+                >
+                  Checkout Selected
                 </Button>
               </SheetClose>
             </SheetFooter>

@@ -9,39 +9,41 @@ export type CartItem = {
   quantity: number;
   image: string;
   seller: string;
+  selected: boolean;
 };
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, 'quantity'>) => void;
+  addItem: (item: Omit<CartItem, 'quantity' | 'selected'>) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
+  toggleItemSelection: (id: string) => void;
+  toggleAllSelection: (selected: boolean) => void;
   clearCart: () => void;
   totalItems: number;
   totalPrice: number;
+  selectedItems: CartItem[];
+  selectedItemsCount: number;
+  selectedItemsTotal: number;
   isCartOpen: boolean;
   setIsCartOpen: (open: boolean) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// Fix: Properly define the CartProvider as a React functional component
 export const CartProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>(() => {
-    // Load cart from localStorage on initial render
     const savedCart = localStorage.getItem('cart');
     return savedCart ? JSON.parse(savedCart) : [];
   });
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // Save to localStorage whenever cart changes
   useEffect(() => {
     localStorage.setItem('cart', JSON.stringify(items));
   }, [items]);
 
-  const addItem = async (product: Omit<CartItem, 'quantity'>) => {
+  const addItem = async (product: Omit<CartItem, 'quantity' | 'selected'>) => {
     try {
-      // Check product availability in database and get the seller_id
       const { data: productData, error } = await supabase
         .from('products')
         .select('stock_quantity, is_available, seller_id, name')
@@ -59,7 +61,6 @@ export const CartProvider: React.FC<{children: React.ReactNode}> = ({ children }
         return;
       }
 
-      // Ensure we have a valid seller_id
       if (!productData.seller_id) {
         console.error('Product has no seller_id:', product.id);
         toast.error('Cannot add product without seller information');
@@ -69,11 +70,9 @@ export const CartProvider: React.FC<{children: React.ReactNode}> = ({ children }
       console.log(`Adding product ${product.id} with seller ID: ${productData.seller_id}`);
       
       setItems(currentItems => {
-        // Check if item already exists in cart
         const existingItemIndex = currentItems.findIndex(item => item.id === product.id);
         
         if (existingItemIndex > -1) {
-          // If it exists, check if we can increase quantity
           const newItems = [...currentItems];
           const newQuantity = newItems[existingItemIndex].quantity + 1;
           
@@ -86,17 +85,16 @@ export const CartProvider: React.FC<{children: React.ReactNode}> = ({ children }
           toast.success(`Added another ${product.name} to your cart`);
           return newItems;
         } else {
-          // If it doesn't exist, add new item with quantity 1 and include seller_id
           toast.success(`${product.name} added to your cart`);
           return [...currentItems, { 
             ...product, 
             quantity: 1,
-            seller: productData.seller_id // Ensure seller ID is included
+            seller: productData.seller_id,
+            selected: false
           }];
         }
       });
 
-      // Open the cart sidebar when an item is added
       setIsCartOpen(true);
     } catch (err) {
       console.error('Error adding item to cart:', err);
@@ -116,7 +114,6 @@ export const CartProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
   const updateQuantity = async (id: string, quantity: number) => {
     try {
-      // Verify quantity against inventory
       if (quantity <= 0) {
         removeItem(id);
         return;
@@ -155,6 +152,20 @@ export const CartProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
   };
 
+  const toggleItemSelection = (id: string) => {
+    setItems(currentItems =>
+      currentItems.map(item =>
+        item.id === id ? { ...item, selected: !item.selected } : item
+      )
+    );
+  };
+
+  const toggleAllSelection = (selected: boolean) => {
+    setItems(currentItems =>
+      currentItems.map(item => ({ ...item, selected }))
+    );
+  };
+
   const clearCart = () => {
     setItems([]);
     toast.success('Cart has been cleared');
@@ -167,14 +178,28 @@ export const CartProvider: React.FC<{children: React.ReactNode}> = ({ children }
     0
   );
 
+  const selectedItems = items.filter(item => item.selected);
+
+  const selectedItemsCount = selectedItems.reduce((total, item) => total + item.quantity, 0);
+
+  const selectedItemsTotal = selectedItems.reduce(
+    (total, item) => total + item.price * item.quantity,
+    0
+  );
+
   const value = {
     items,
     addItem,
     removeItem,
     updateQuantity,
+    toggleItemSelection,
+    toggleAllSelection,
     clearCart,
     totalItems,
     totalPrice,
+    selectedItems,
+    selectedItemsCount,
+    selectedItemsTotal,
     isCartOpen,
     setIsCartOpen
   };
