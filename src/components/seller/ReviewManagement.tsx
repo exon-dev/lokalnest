@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,7 +42,41 @@ const ReviewManagement = () => {
   const fetchReviews = async () => {
     setLoading(true);
     try {
-      // In a real app, you should join with products table to get product names
+      // First get the current seller's ID
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        toast.error('You must be logged in to view reviews');
+        setLoading(false);
+        return;
+      }
+      
+      const sellerId = session.user.id;
+      
+      // Get all products belonging to this seller
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id')
+        .eq('seller_id', sellerId);
+      
+      if (productsError) {
+        console.error('Error fetching seller products:', productsError);
+        toast.error('Failed to load seller products');
+        setLoading(false);
+        return;
+      }
+      
+      if (!products || products.length === 0) {
+        // Seller has no products yet
+        setReviews([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Extract product IDs
+      const productIds = products.map(product => product.id);
+      
+      // Now get reviews only for these products
       const { data, error } = await supabase
         .from('reviews')
         .select(`
@@ -56,6 +89,7 @@ const ReviewManagement = () => {
           products:product_id(name),
           profiles:buyer_id(full_name)
         `)
+        .in('product_id', productIds)
         .order('created_at', { ascending: false });
         
       if (error) throw error;

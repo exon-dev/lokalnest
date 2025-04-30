@@ -19,7 +19,7 @@ import {
 import { toast } from 'sonner';
 import { ChevronLeft, RefreshCw } from 'lucide-react';
 import { stripePromise, createPaymentIntent } from '@/services/stripeService';
-import { createOrder, Order } from '@/services/orderService';
+import { createOrder } from '@/services/orderService';
 import { getDefaultAddress, getUserProfile } from '@/services/userService';
 import StripeCardElement from '@/components/checkout/StripeCardElement';
 
@@ -154,30 +154,25 @@ const Checkout: React.FC = () => {
         address: formattedAddress
       });
       
-      // Calculate total amount
-      const totalAmount = totalPrice + shippingFee;
-      
-      // Prepare seller ID (assuming all items are from the same seller)
-      // In a real app with multiple sellers, this would need to be handled differently
+      // Get the seller ID from the first item (assuming all items are from the same seller)
       const sellerId = items[0]?.seller || null;
+      
+      // Prepare order data object with all required fields
+      const orderData = {
+        seller_id: sellerId,
+        shipping_address: formattedAddress,
+        billing_address: formattedAddress,
+        payment_method: paymentMethod,
+        total_amount: totalWithShipping
+      };
       
       if (paymentMethod === 'cod') {
         // Process COD order
         console.log('Processing COD order...');
         try {
-          const orderData: Partial<Order> = {
-            seller_id: sellerId,
-            status: 'pending',
-            payment_method: 'cod',
-            payment_status: 'pending',
-            total_amount: totalAmount,
-            shipping_address: formattedAddress,
-            billing_address: formattedAddress
-          };
+          const orderId = await createOrder(orderData, items);
           
-          const order = await createOrder(orderData, items);
-          
-          console.log('COD order created successfully:', order);
+          console.log('COD order created successfully:', orderId);
           toast.success('Order placed successfully!');
           clearCart();
           navigate('/buyer/orders');
@@ -189,17 +184,13 @@ const Checkout: React.FC = () => {
         // For Stripe, the payment is processed by the StripeCardElement component
         // Here we just create the order with the payment_intent_id
         try {
-          const orderData: Partial<Order> = {
-            seller_id: sellerId,
-            status: 'pending',
-            payment_method: 'stripe',
-            payment_status: 'processing',
-            total_amount: totalAmount,
-            shipping_address: formattedAddress,
-            billing_address: formattedAddress
+          // Add payment intent ID to the order data
+          const stripeOrderData = {
+            ...orderData,
+            payment_intent_id: paymentIntentId
           };
           
-          const order = await createOrder(orderData, items);
+          const orderId = await createOrder(stripeOrderData, items);
           
           // We'll update the order status when the payment succeeds
           // This is handled in the onPaymentSuccess callback
@@ -221,24 +212,22 @@ const Checkout: React.FC = () => {
       // Format the shipping address
       const formattedAddress = `${shippingInfo.fullName}, ${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.province} ${shippingInfo.postalCode}, Phone: ${shippingInfo.phone}`;
       
-      // Calculate total amount
-      const totalAmount = totalPrice + shippingFee;
-      
-      // Prepare seller ID (assuming all items are from the same seller)
+      // Get the seller ID from the first item
       const sellerId = items[0]?.seller || null;
       
-      // Create the order with the completed payment intent ID
-      const orderData: Partial<Order> = {
+      // Create proper order data
+      const orderData = {
         seller_id: sellerId,
-        status: 'pending',
-        payment_method: 'stripe',
-        payment_status: 'paid',
-        total_amount: totalAmount,
         shipping_address: formattedAddress,
-        billing_address: formattedAddress
+        billing_address: formattedAddress,
+        payment_method: 'stripe',
+        payment_intent_id: completedPaymentIntentId,
+        payment_status: 'succeeded',
+        total_amount: totalWithShipping
       };
       
-      const order = await createOrder(orderData, items);
+      // Create the order with the completed payment intent ID
+      const orderId = await createOrder(orderData, items);
       
       // The order has been created and the payment has been processed
       toast.success('Payment successful! Your order has been placed.');

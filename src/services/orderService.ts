@@ -132,6 +132,7 @@ export async function createOrder(orderData: Partial<Order>, cartItems?: CartIte
       throw new Error('Billing address is required');
     }
 
+    // Use the single() method to ensure column references are not ambiguous
     const { data, error } = await supabase
       .from('orders')
       .insert(orderData as any)
