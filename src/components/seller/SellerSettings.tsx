@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Check } from 'lucide-react';
+import { Loader2, Check, UploadCloud } from 'lucide-react';
 import { 
   getCurrentSellerProfile, 
   updateSellerProfile, 
@@ -20,10 +20,14 @@ import {
   getNotificationPreferences,
   updateNotificationPreferences
 } from '@/services/notificationService';
+import { supabase } from '@/integrations/supabase/client';
 
 const SellerSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [profileData, setProfileData] = useState<Partial<SellerProfile>>({
     business_name: '',
     description: '',
@@ -72,6 +76,10 @@ const SellerSettings = () => {
             logo_url: profile.logo_url || '',
             location: profile.location || ''
           });
+
+          if (profile.logo_url) {
+            setLogoPreview(profile.logo_url);
+          }
         } else {
           // If we couldn't initialize, try to get existing profile anyway
           console.log('Falling back to getting current profile');
@@ -91,6 +99,10 @@ const SellerSettings = () => {
               logo_url: existingProfile.logo_url || '',
               location: existingProfile.location || ''
             });
+
+            if (existingProfile.logo_url) {
+              setLogoPreview(existingProfile.logo_url);
+            }
           } else {
             console.error("Could not initialize or get seller profile");
             toast.error("Failed to setup your seller profile. Please try again later.");
@@ -121,13 +133,68 @@ const SellerSettings = () => {
     }));
   };
 
+  const uploadLogo = async (): Promise<string | null> => {
+    if (!logoFile) return profileData.logo_url || null;
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      
+      const fileExt = logoFile.name.split('.').pop();
+      const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
+      
+      // Upload to Supabase Storage (store_logos bucket should exist from StoreManagement)
+      const { data, error } = await supabase.storage
+        .from('store_logos')
+        .upload(fileName, logoFile, {
+          cacheControl: '3600',
+          upsert: true
+        });
+      
+      if (error) throw error;
+      
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('store_logos')
+        .getPublicUrl(data.path);
+        
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      toast.error('Failed to upload logo');
+      return null;
+    }
+  };
+
   const handleSaveChanges = async () => {
     setSaving(true);
     try {
-      // First, remove the console.log for cleaner code
-      const success = await updateSellerProfile(profileData);
+      // Upload logo if a new one was selected
+      let logoUrl = profileData.logo_url;
+      if (logoFile) {
+        const uploadedLogoUrl = await uploadLogo();
+        if (uploadedLogoUrl) {
+          logoUrl = uploadedLogoUrl;
+        }
+      }
+
+      // Update profile data with new logo URL
+      const updatedProfileData = {
+        ...profileData,
+        logo_url: logoUrl
+      };
       
-      // Always explicitly show a toast notification here
+      const success = await updateSellerProfile(updatedProfileData);
+      
+      // Update local state with the new logo URL
+      setProfileData(prev => ({
+        ...prev,
+        logo_url: logoUrl || prev.logo_url
+      }));
+
+      // Clear the file input state
+      setLogoFile(null);
+      
       toast.success("Profile updated successfully", {
         description: "Your store profile has been saved.",
         icon: <Check className="h-4 w-4" />,
@@ -145,9 +212,41 @@ const SellerSettings = () => {
   };
 
   const handleLogoChange = () => {
-    // In a real application, this would open a file selector
-    // and upload the image to storage, then update the logo_url
-    toast.info("This feature would allow you to upload a new logo image");
+    // Trigger file input click
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
+      return;
+    }
+    
+    // Preview the selected image
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setLogoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    
+    // Store the file for later upload
+    setLogoFile(file);
+    
+    toast.info("Logo selected. Save changes to update your profile.", {
+      duration: 3000
+    });
   };
 
   const handleNotificationToggle = (key: keyof NotificationPreferences) => {
@@ -211,10 +310,28 @@ const SellerSettings = () => {
                 <div className="space-y-4">
                   <div className="flex flex-col items-center justify-center p-6 border rounded-lg">
                     <Avatar className="w-24 h-24 mb-4">
-                      <AvatarImage src={profileData.logo_url || "https://images.unsplash.com/photo-1611080626919-7cf5a9dbab12?q=80&w=200"} />
+                      <AvatarImage src={logoPreview || profileData.logo_url || "https://images.unsplash.com/photo-1611080626919-7cf5a9dbab12?q=80&w=200"} />
                       <AvatarFallback>{profileData.business_name?.substring(0, 2) || "ST"}</AvatarFallback>
                     </Avatar>
-                    <Button variant="outline" size="sm" onClick={handleLogoChange}>Change Logo</Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileInputChange}
+                    />
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex items-center" 
+                      onClick={handleLogoChange}
+                    >
+                      <UploadCloud className="h-4 w-4 mr-2" />
+                      Change Logo
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Recommended: 500x500px (Max 5MB)
+                    </p>
                   </div>
                 </div>
                 
@@ -386,17 +503,6 @@ const SellerSettings = () => {
                     onCheckedChange={() => handleNotificationToggle('order_notifications')}
                   />
                 </div>
-                
-                {/* <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">Product Stock Alerts</h3>
-                    <p className="text-sm text-muted-foreground">Get notified when products are low in stock</p>
-                  </div>
-                  <Switch 
-                    checked={notificationPrefs.stock_alerts}
-                    onCheckedChange={() => handleNotificationToggle('stock_alerts')}
-                  />
-                </div> */}
                 
                 <div className="flex items-center justify-between">
                   <div>
