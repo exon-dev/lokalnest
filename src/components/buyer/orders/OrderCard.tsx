@@ -299,8 +299,10 @@ const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
                       <td className="px-4 py-3 text-right font-medium text-sm">₱{order.items.reduce((sum, item) => sum + item.quantity * item.price, 0).toLocaleString()}</td>
                     </tr>
                     <tr>
-                      <td colSpan={3} className="px-4 py-3 text-right font-medium text-sm">Shipping Fee (Standard)</td>
-                      <td className="px-4 py-3 text-right font-medium text-sm">₱150.00</td>
+                      <td colSpan={3} className="px-4 py-3 text-right font-medium text-sm">Shipping Fee</td>
+                      <td className="px-4 py-3 text-right font-medium text-sm">
+                        ₱{(order.total - order.items.reduce((sum, item) => sum + item.quantity * item.price, 0)).toLocaleString()}
+                      </td>
                     </tr>
                     <tr className="bg-muted/50">
                       <td colSpan={3} className="px-4 py-3 text-right font-medium">Total</td>
