@@ -29,65 +29,68 @@ import { ThemeProvider } from './components/theme/ThemeProvider';
 import Profile from './pages/Profile';
 import InventoryManagementNew from './components/seller/InventoryManagementNew';
 import SellerMessagesDashboard from './pages/SellerMessagesDashboard';
+import { MobileMenuProvider } from './context/MobileMenuContext';
 
 function App() {
   return (
     <ThemeProvider defaultTheme="light">
-      <CartProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/verify" element={<VerifyOTP />} />
-            <Route path="/seller-verification" element={<SellerVerification />} />
-            
-            {/* Seller Dashboard Routes */}
-            <Route path="/seller">
-              <Route index element={<Navigate to="/seller/dashboard" replace />} />
-              <Route path="dashboard" element={<SellerDashboard />}>
-                <Route index element={<Navigate to="/seller/dashboard/overview" replace />} />
-                <Route path="overview" element={<div>Overview</div>} />
-                <Route path="products" element={<ProductManagement />} />
-                <Route path="inventory" element={<InventoryManagementNew />} />
-                <Route path="orders" element={<OrderManagement />} />
-                <Route path="messages" element={<SellerMessagesDashboard />} />
-                <Route path="customers" element={<CustomerManagement />} />
-                <Route path="promotions" element={<PromotionManagement />} />
-                <Route path="logistics" element={<LogisticsManagement />} />
-                <Route path="reviews" element={<ReviewManagement />} />
-                <Route path="settings" element={<SellerSettings />} />
+      <MobileMenuProvider>
+        <CartProvider>
+          <Router>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/verify" element={<VerifyOTP />} />
+              <Route path="/seller-verification" element={<SellerVerification />} />
+              
+              {/* Seller Dashboard Routes */}
+              <Route path="/seller">
+                <Route index element={<Navigate to="/seller/dashboard" replace />} />
+                <Route path="dashboard" element={<SellerDashboard />}>
+                  <Route index element={<Navigate to="/seller/dashboard/overview" replace />} />
+                  <Route path="overview" element={<div>Overview</div>} />
+                  <Route path="products" element={<ProductManagement />} />
+                  <Route path="inventory" element={<InventoryManagementNew />} />
+                  <Route path="orders" element={<OrderManagement />} />
+                  <Route path="messages" element={<SellerMessagesDashboard />} />
+                  <Route path="customers" element={<CustomerManagement />} />
+                  <Route path="promotions" element={<PromotionManagement />} />
+                  <Route path="logistics" element={<LogisticsManagement />} />
+                  <Route path="reviews" element={<ReviewManagement />} />
+                  <Route path="settings" element={<SellerSettings />} />
+                </Route>
               </Route>
-            </Route>
-            
-            {/* Buyer Routes */}
-            <Route path="/buyer" element={<BuyerDashboard />}>
-              <Route index element={<Navigate to="/buyer/home" replace />} />
-              <Route path="dashboard" element={<div>Dashboard</div>} />
-              <Route path="home" element={<BuyerHome />} />
-              <Route path="orders" element={<BuyerOrders />} />
-              <Route path="payments" element={<BuyerPayments />} />
-              <Route path="reviews" element={<BuyerReviews />} />
-              <Route path="support" element={<BuyerSupport />} />
-              <Route path="messages" element={<BuyerMessages />} />
-            </Route>
-            
-            {/* Admin Routes */}
-            <Route path="/admin" element={<AdminDashboard />}>
-              <Route index element={<Navigate to="/admin/dashboard" replace />} />
-              <Route path="dashboard" element={<div>Admin Dashboard</div>} />
-              <Route path="seller-verifications" element={<SellerVerificationManagement />} />
-            </Route>
-            
-            <Route path="/checkout" element={<Checkout />} />
-            <Route path="/product/:id" element={<ProductDetail />} />
-            <Route path="/artisan/:id" element={<SellerProfile />} />
-            <Route path="/profile" element={<Profile />} />
-            
-            {/* Add additional routes here */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Router>
-      </CartProvider>
+              
+              {/* Buyer Routes */}
+              <Route path="/buyer" element={<BuyerDashboard />}>
+                <Route index element={<Navigate to="/buyer/home" replace />} />
+                <Route path="dashboard" element={<div>Dashboard</div>} />
+                <Route path="home" element={<BuyerHome />} />
+                <Route path="orders" element={<BuyerOrders />} />
+                <Route path="payments" element={<BuyerPayments />} />
+                <Route path="reviews" element={<BuyerReviews />} />
+                <Route path="support" element={<BuyerSupport />} />
+                <Route path="messages" element={<BuyerMessages />} />
+              </Route>
+              
+              {/* Admin Routes */}
+              <Route path="/admin" element={<AdminDashboard />}>
+                <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="dashboard" element={<div>Admin Dashboard</div>} />
+                <Route path="seller-verifications" element={<SellerVerificationManagement />} />
+              </Route>
+              
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/product/:id" element={<ProductDetail />} />
+              <Route path="/artisan/:id" element={<SellerProfile />} />
+              <Route path="/profile" element={<Profile />} />
+              
+              {/* Add additional routes here */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Router>
+        </CartProvider>
+      </MobileMenuProvider>
     </ThemeProvider>
   );
 }

@@ -4,16 +4,39 @@ import BuyerSidebar from '@/components/buyer/BuyerSidebar';
 import { Button } from '@/components/ui/button';
 import { ShoppingBag, CreditCard, MessageSquare } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
+import { useMobileMenu } from '@/context/MobileMenuContext';
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 const BuyerDashboard = () => {
   const location = useLocation();
   const isRootDashboard = location.pathname === '/buyer/dashboard';
+  // Use the shared mobile menu context for controlling the sidebar
+  const { isOpen, setIsOpen } = useMobileMenu();
 
   return (
     <Layout>
       <div className="min-h-screen bg-background">
+        {/* Mobile Sheet sidebar - using the navbar's hamburger menu through context */}
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
+          <SheetContent 
+            side="left" 
+            className="w-[250px] sm:w-[300px] p-0 z-[100] bg-slate-900 text-white border-r-0 pt-0"
+          >
+            <BuyerSidebar 
+              inDrawer={true} 
+              isOpen={isOpen} 
+              onOpenChange={setIsOpen} 
+              className="bg-transparent"
+            />
+          </SheetContent>
+        </Sheet>
+        
         <div className="flex flex-col md:flex-row">
-          <BuyerSidebar />
+          {/* Only show regular sidebar on desktop */}
+          <div className="hidden md:block">
+            <BuyerSidebar />
+          </div>
+          
           <main className="flex-1 p-4 md:p-6">
             {isRootDashboard ? (
               <div className="space-y-6">

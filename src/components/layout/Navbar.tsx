@@ -40,6 +40,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import NotificationsMenu from '@/components/notifications/NotificationsMenu';
+import { useMobileMenu } from '@/context/MobileMenuContext';
 
 const categories = [
   { name: "Textiles & Clothing", href: "/category/textiles-clothing" },
@@ -54,7 +55,6 @@ const categories = [
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { totalItems } = useCart();
   const [user, setUser] = useState<any>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -62,6 +62,9 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
+  
+  // Use our shared mobile menu context
+  const { isOpen: mobileMenuOpen, toggle: toggleMobileMenu } = useMobileMenu();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -342,8 +345,8 @@ const Navbar = () => {
                 )}
                 {/* Show Orders only for buyers or users who aren't explicitly sellers */}
                 {(isBuyer || user?.user_metadata?.account_type !== 'seller') && (
-                  <DropdownMenuItem onClick={() => navigate('/buyer/orders')}>
-                    Orders
+                  <DropdownMenuItem onClick={() => navigate('/buyer/home')}>
+                    Home
                   </DropdownMenuItem>
                 )}
                 {user?.user_metadata?.account_type === 'seller' && (
@@ -374,12 +377,13 @@ const Navbar = () => {
             </Link>
           )}
           
-          {/* Mobile menu button */}
+          {/* Mobile menu button - now using our context */}
           <Button
             variant="ghost"
             size="icon"
             className="md:hidden"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            onClick={toggleMobileMenu}
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
           >
             {mobileMenuOpen ? (
               <X className="h-5 w-5" />
