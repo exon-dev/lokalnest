@@ -9,10 +9,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useMobileMenu } from "@/context/MobileMenuContext"
 
 export function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
   const { setTheme, theme, resolvedTheme } = useTheme()
+  const { isOpen: mobileMenuOpen, setIsOpen: setMobileMenuOpen } = useMobileMenu()
+  const [dropdownOpen, setDropdownOpen] = useState(false)
 
   // When mounted on client, allow theme toggle
   useEffect(() => {
@@ -21,28 +24,39 @@ export function ThemeToggle() {
 
   // Handle theme change
   const toggleTheme = (newTheme: string) => {
-    setTheme(newTheme)
-
-    // Force apply dark mode class immediately for a more responsive feel
-    const html = document.documentElement
-    const isDarkTheme = newTheme === 'dark' || (newTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    // First, always close the dropdown
+    setDropdownOpen(false)
     
-    if (isDarkTheme) {
-      html.classList.add('dark')
-      document.body.classList.add('dark')
+    // On mobile, close the mobile menu
+    if (window.innerWidth < 768) {
+      // Close mobile menu if open
+      if (mobileMenuOpen) {
+        setMobileMenuOpen(false)
+      }
+      
+      // Schedule theme change after UI elements have closed
+      window.setTimeout(() => {
+        // Set theme through React hook
+        setTheme(newTheme)
+        
+        // Store in localStorage
+        localStorage.setItem('lokalNest-ui-theme', newTheme)
+        
+        // Force browser to apply all pending DOM changes
+        window.requestAnimationFrame(() => {
+          // Allow a brief moment for everything to settle
+          window.setTimeout(() => {
+            // Re-enable React event handlers by triggering a small state update
+            // This helps React "reconnect" event handlers after DOM changes
+            setMounted(prev => prev)
+          }, 50)
+        })
+      }, 100)
     } else {
-      html.classList.remove('dark')
-      document.body.classList.remove('dark')
+      // On desktop, just change the theme
+      setTheme(newTheme)
+      localStorage.setItem('lokalNest-ui-theme', newTheme)
     }
-
-    // Store theme in localStorage for immediate access on page load
-    localStorage.setItem('lokalNest-ui-theme', newTheme)
-    
-    // Force a re-render of components by adding and removing a utility class
-    document.body.classList.add('theme-change')
-    setTimeout(() => {
-      document.body.classList.remove('theme-change')
-    }, 10)
   }
 
   // If not mounted yet, render a placeholder to avoid layout shift
@@ -55,7 +69,7 @@ export function ThemeToggle() {
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="h-8 w-8">
           {resolvedTheme === 'dark' ? (
@@ -90,4 +104,4 @@ export function ThemeToggle() {
       </DropdownMenuContent>
     </DropdownMenu>
   )
-} 
+}
