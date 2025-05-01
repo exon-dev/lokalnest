@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ProductCard from './ProductCard';
 import { cn } from '@/lib/utils';
@@ -11,6 +10,11 @@ interface Product {
   seller: string;
   category: string;
   location: string;
+  sale_price?: number;
+  promotion?: {
+    discount_type: 'percentage' | 'fixed';
+    discount_value: number;
+  } | null;
 }
 
 interface ProductGridProps {
@@ -50,6 +54,8 @@ const ProductGrid: React.FC<ProductGridProps> = ({
           seller={product.seller}
           category={product.category}
           location={product.location}
+          salePrice={product.sale_price}
+          promotion={product.promotion}
         />
       ))}
     </div>

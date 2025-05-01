@@ -15,6 +15,11 @@ interface ProductCardProps {
   category: string;
   location: string;
   className?: string;
+  salePrice?: number;
+  promotion?: {
+    discount_type: 'percentage' | 'fixed';
+    discount_value: number;
+  } | null;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({
@@ -26,15 +31,40 @@ const ProductCard: React.FC<ProductCardProps> = ({
   category,
   location,
   className,
+  salePrice,
+  promotion,
 }) => {
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const { addItem } = useCart();
 
+  // Calculate the discounted price based on promotion if available
+  const getDiscountedPrice = (): number => {
+    // If there's a sale price already set, use that
+    if (salePrice) return salePrice;
+    
+    // If there's a promotion, calculate the discount
+    if (promotion) {
+      if (promotion.discount_type === 'percentage') {
+        const discountAmount = price * (promotion.discount_value / 100);
+        return parseFloat((price - discountAmount).toFixed(2));
+      } else { // fixed discount
+        return Math.max(0, price - promotion.discount_value);
+      }
+    }
+    
+    // No discount
+    return price;
+  };
+
+  const discountedPrice = getDiscountedPrice();
+  const hasDiscount = discountedPrice < price;
+  const discountPercentage = hasDiscount ? Math.round((1 - discountedPrice / price) * 100) : 0;
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem({ id, name, price, image, seller });
+    addItem({ id, name, price: discountedPrice, image, seller });
   };
 
   const handleWishlist = (e: React.MouseEvent) => {
@@ -90,12 +120,32 @@ const ProductCard: React.FC<ProductCardProps> = ({
             {category}
           </span>
         </div>
+        
+        {/* Discount badge */}
+        {hasDiscount && (
+          <div className="absolute top-3 right-3">
+            <span className="inline-block bg-red-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+              {discountPercentage}% OFF
+            </span>
+          </div>
+        )}
       </div>
       
       <div className="flex flex-col p-4">
         <div className="text-muted-foreground text-xs mb-1">{seller} • {location}</div>
         <h3 className="font-medium mb-1 line-clamp-1 text-foreground">{name}</h3>
-        <div className="text-sm font-semibold mb-3 text-foreground">₱{price.toFixed(2)}</div>
+        
+        {/* Price display */}
+        <div className="mb-3">
+          {hasDiscount ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">₱{discountedPrice.toFixed(2)}</span>
+              <span className="text-xs text-muted-foreground line-through">₱{price.toFixed(2)}</span>
+            </div>
+          ) : (
+            <div className="text-sm font-semibold text-foreground">₱{price.toFixed(2)}</div>
+          )}
+        </div>
         
         <Button 
           className={cn(

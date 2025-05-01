@@ -39,6 +39,72 @@ const ProductDetail = () => {
   const [sellerReviewCount, setSellerReviewCount] = useState(0);
   const { addItem } = useCart();
 
+  // Calculate discounted price based on promotion
+  const getDiscountedPrice = () => {
+    if (!product) return 0;
+    
+    // If there's already a sale_price set, use that
+    if (product.sale_price) {
+      return product.sale_price;
+    }
+    
+    // If there's a promotion, calculate the discount
+    if (product.promotion) {
+      if (product.promotion.discount_type === 'percentage') {
+        const discountAmount = product.price * (product.promotion.discount_value / 100);
+        return parseFloat((product.price - discountAmount).toFixed(2));
+      } else { // fixed discount
+        return Math.max(0, product.price - product.promotion.discount_value);
+      }
+    }
+    
+    // No discount applies
+    return product.price;
+  };
+  
+  // Calculate discount percentage for display
+  const getDiscountPercentage = () => {
+    if (!product) return 0;
+    
+    const originalPrice = product.price;
+    const discountedPrice = getDiscountedPrice();
+    
+    if (originalPrice === discountedPrice) return 0;
+    
+    return Math.round((1 - discountedPrice / originalPrice) * 100);
+  };
+  
+  // Return appropriate price display component
+  const getPriceDisplay = () => {
+    if (!product) return null;
+    
+    const discountedPrice = getDiscountedPrice();
+    const discountPercentage = getDiscountPercentage();
+    
+    // If no discount, show regular price
+    if (discountPercentage === 0) {
+      return (
+        <span className="text-2xl font-semibold">₱{product.price.toFixed(2)}</span>
+      );
+    }
+    
+    // Show discounted price with original price strikethrough
+    return (
+      <div className="flex flex-col space-y-1">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl font-semibold text-primary">₱{discountedPrice.toFixed(2)}</span>
+          <span className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-medium">
+            {discountPercentage}% OFF
+          </span>
+        </div>
+        <div className="text-muted-foreground">
+          <span className="line-through">₱{product.price.toFixed(2)}</span>
+          <span className="ml-2 text-sm">Original Price</span>
+        </div>
+      </div>
+    );
+  };
+
   useEffect(() => {
     async function loadProduct() {
       if (!id) {
@@ -118,7 +184,7 @@ const ProductDetail = () => {
     addItem({
       id: product.id,
       name: product.name,
-      price: product.sale_price || product.price,
+      price: getDiscountedPrice(),
       image: product.images?.length ? product.images[0].url : '',
       seller: product.seller.business_name
     });
@@ -286,17 +352,7 @@ const ProductDetail = () => {
 
             {/* Price */}
             <div>
-              {product.sale_price ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-semibold">₱{product.sale_price.toFixed(2)}</span>
-                  <span className="text-lg text-muted-foreground line-through">₱{product.price.toFixed(2)}</span>
-                  <span className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-medium">
-                    {Math.round((1 - product.sale_price / product.price) * 100)}% OFF
-                  </span>
-                </div>
-              ) : (
-                <span className="text-2xl font-semibold">₱{product.price.toFixed(2)}</span>
-              )}
+              {getPriceDisplay()}
             </div>
 
             {/* Promotion Banner */}
