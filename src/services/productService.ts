@@ -73,6 +73,7 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
         materials,
         tags,
         seller_id,
+        promotion_id,
         categories!inner(id, name, slug),
         seller_profiles!inner(
           id, 
@@ -124,14 +125,16 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
 
     // Fetch promotion data if available
     let promotionData = null;
-    // Check for promotions related to this product
-    const { data: promotions, error: promotionError } = await (supabase
-      .from('promotions' as any)
-      .select('id, title, description, discount_type, discount_value')
-      .eq('product_id', id)) as any;
-      
-    if (!promotionError && promotions && promotions.length > 0) {
-      promotionData = promotions[0];
+    if (product.promotion_id) {
+      const { data: promotion, error: promotionError } = await supabase
+        .from('promotions')
+        .select('id, title, description, discount_type, discount_value')
+        .eq('id', product.promotion_id)
+        .single();
+        
+      if (!promotionError && promotion) {
+        promotionData = promotion;
+      }
     }
 
     // Format the data to match our expected structure
@@ -235,10 +238,13 @@ export async function getAllProducts(filters: {
       id,
       name,
       price,
+      sale_price,
+      promotion_id,
       is_available,
       stock_quantity,
       seller_profiles(business_name, location),
-      product_images(url, is_primary)
+      product_images(url, is_primary),
+      promotions(id, title, description, discount_type, discount_value)
     `;
     
     // Add categories with proper join type based on filter
@@ -247,22 +253,28 @@ export async function getAllProducts(filters: {
         id,
         name,
         price,
+        sale_price,
+        promotion_id,
         is_available,
         stock_quantity,
         categories!inner(name),
         seller_profiles(business_name, location),
-        product_images(url, is_primary)
+        product_images(url, is_primary),
+        promotions(id, title, description, discount_type, discount_value)
       `;
     } else {
       selectStr = `
         id,
         name,
         price,
+        sale_price,
+        promotion_id,
         is_available,
         stock_quantity,
         categories(name),
         seller_profiles(business_name, location),
-        product_images(url, is_primary)
+        product_images(url, is_primary),
+        promotions(id, title, description, discount_type, discount_value)
       `;
     }
 
@@ -300,9 +312,17 @@ export async function getAllProducts(filters: {
       id: string;
       name: string;
       price: number;
+      sale_price?: number | null;
       product_images: Array<{ url: string; is_primary?: boolean | null }> | null;
       seller_profiles?: { business_name?: string | null; location?: string | null } | null;
       categories?: { name: string } | null;
+      promotions?: {
+        id: string;
+        title: string;
+        description: string;
+        discount_type: 'percentage' | 'fixed';
+        discount_value: number;
+      } | null;
     };
     
     // Transform data to match the expected format
@@ -318,10 +338,18 @@ export async function getAllProducts(filters: {
           id: product.id,
           name: product.name,
           price: product.price,
+          sale_price: product.sale_price || undefined,
           image: image,
           seller: product.seller_profiles?.business_name || 'Unknown',
           category: product.categories ? product.categories.name : 'Uncategorized',
-          location: product.seller_profiles?.location || 'Philippines'
+          location: product.seller_profiles?.location || 'Philippines',
+          promotion: product.promotions ? {
+            id: product.promotions.id,
+            title: product.promotions.title,
+            description: product.promotions.description,
+            discount_type: product.promotions.discount_type,
+            discount_value: product.promotions.discount_value
+          } : undefined
         };
     });
 
