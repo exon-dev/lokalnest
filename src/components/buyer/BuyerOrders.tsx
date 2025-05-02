@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,11 +42,11 @@ const BuyerOrders = () => {
       </div>
 
       <Tabs defaultValue="all" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="all">All Orders</TabsTrigger>
-          <TabsTrigger value="processing">Processing</TabsTrigger>
-          <TabsTrigger value="shipped">Shipped</TabsTrigger>
-          <TabsTrigger value="delivered">Delivered</TabsTrigger>
+        <TabsList className="w-full flex overflow-x-auto scrollbar-hide max-w-full pb-1">
+          <TabsTrigger className="flex-1 min-w-max whitespace-nowrap" value="all">All Orders</TabsTrigger>
+          <TabsTrigger className="flex-1 min-w-max whitespace-nowrap" value="processing">Processing</TabsTrigger>
+          <TabsTrigger className="flex-1 min-w-max whitespace-nowrap" value="shipped">Shipped</TabsTrigger>
+          <TabsTrigger className="flex-1 min-w-max whitespace-nowrap" value="delivered">Delivered</TabsTrigger>
         </TabsList>
         
         <TabsContent value="all">

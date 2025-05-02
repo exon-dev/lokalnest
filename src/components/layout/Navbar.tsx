@@ -7,7 +7,12 @@ import {
   User, 
   Menu, 
   X,
-  LogOut
+  LogOut,
+  Home,
+  ShoppingBag,
+  MessageSquare,
+  CreditCard,
+  Star
 } from 'lucide-react';
 import {
   Sheet,
@@ -244,6 +249,7 @@ const Navbar = () => {
           <span className="text-gradient dark:text-white">LokalNest</span>
         </Link>
 
+        {/* Desktop Navigation Menu */}
         <div className="hidden md:flex items-center space-x-8">
           <NavigationMenu>
             <NavigationMenuList>
@@ -291,15 +297,15 @@ const Navbar = () => {
         </div>
 
         {/* User actions */}
-        <div className="flex items-center gap-2">
-          {/* Search button (small screens) */}
+        <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+          {/* Search button - responsive sizing */}
           <Button 
             variant="ghost" 
             size="icon"
-            className="md:hidden" 
+            className="h-8 w-8 md:h-9 md:w-9" 
             onClick={() => setSearchOpen(true)}
           >
-            <Search className="h-5 w-5" />
+            <Search className="h-4 w-4 md:h-5 md:w-5" />
           </Button>
           
           {/* Shopping cart - show for buyers only (not on homepage or auth routes) */}
@@ -333,7 +339,7 @@ const Navbar = () => {
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {/* Show Profile only for buyers, not for sellers */}
@@ -346,11 +352,13 @@ const Navbar = () => {
                 {/* Show Orders only for buyers or users who aren't explicitly sellers */}
                 {(isBuyer || user?.user_metadata?.account_type !== 'seller') && (
                   <DropdownMenuItem onClick={() => navigate('/buyer/home')}>
+                    <Home className="mr-2 h-4 w-4" />
                     Home
                   </DropdownMenuItem>
                 )}
                 {user?.user_metadata?.account_type === 'seller' && (
                   <DropdownMenuItem onClick={() => navigate('/seller/dashboard')}>
+                    <ShoppingBag className="mr-2 h-4 w-4" />
                     Seller Dashboard
                   </DropdownMenuItem>
                 )}
@@ -370,11 +378,14 @@ const Navbar = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Link to="/auth" className="hidden md:block">
-              <Button variant="default" size="sm" className="ml-4">
-                Sign In
-              </Button>
-            </Link>
+            <>
+              {/* For mobile, show sign in button in the mobile menu */}
+              <Link to="/auth" className="hidden md:block">
+                <Button variant="default" size="sm" className="ml-4">
+                  Sign In
+                </Button>
+              </Link>
+            </>
           )}
           
           {/* Mobile menu button - now using our context */}
@@ -393,6 +404,163 @@ const Navbar = () => {
           </Button>
         </div>
       </div>
+
+      {/* Mobile Menu Sheet */}
+      <Sheet open={mobileMenuOpen} onOpenChange={setIsOpen => {
+        if (!setIsOpen) toggleMobileMenu();
+      }}>
+        <SheetContent side="left" className="w-[80%] max-w-[300px] sm:max-w-sm p-0">
+          <div className="flex flex-col h-full">
+            {/* Mobile menu header */}
+            <div className="p-4 border-b">
+              <div className="flex items-center justify-between">
+                <Link 
+                  to="/" 
+                  className="text-xl font-medium tracking-tight"
+                  onClick={() => toggleMobileMenu()}
+                >
+                  <span className="text-gradient dark:text-white">LokalNest</span>
+                </Link>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={toggleMobileMenu}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Mobile menu content */}
+            <div className="flex-1 overflow-auto py-2">
+              <div className="flex flex-col space-y-1">
+                {/* Show Home link */}
+                <Link 
+                  to="/" 
+                  className="flex items-center px-4 py-3 hover:bg-accent"
+                  onClick={() => toggleMobileMenu()}
+                >
+                  <Home className="mr-3 h-5 w-5" />
+                  <span className="text-sm font-medium">Home</span>
+                </Link>
+                
+                {/* Show Profile for signed in users */}
+                {isSignedIn && user && (
+                  <>
+                    {/* Profile link */}
+                    <Link 
+                      to="/profile" 
+                      className="flex items-center px-4 py-3 hover:bg-accent"
+                      onClick={() => toggleMobileMenu()}
+                    >
+                      <User className="mr-3 h-5 w-5" />
+                      <span className="text-sm font-medium">Profile</span>
+                    </Link>
+                    
+                    {/* Show Orders for buyers */}
+                    {(isBuyer || user?.user_metadata?.account_type !== 'seller') && (
+                      <>
+                        <Link 
+                          to="/buyer/home" 
+                          className="flex items-center px-4 py-3 hover:bg-accent"
+                          onClick={() => toggleMobileMenu()}
+                        >
+                          <ShoppingBag className="mr-3 h-5 w-5" />
+                          <span className="text-sm font-medium">My Orders</span>
+                        </Link>
+                        
+                        <Link 
+                          to="/messages" 
+                          className="flex items-center px-4 py-3 hover:bg-accent"
+                          onClick={() => toggleMobileMenu()}
+                        >
+                          <MessageSquare className="mr-3 h-5 w-5" />
+                          <span className="text-sm font-medium">Messages</span>
+                        </Link>
+                        
+                        <Link 
+                          to="/payments" 
+                          className="flex items-center px-4 py-3 hover:bg-accent"
+                          onClick={() => toggleMobileMenu()}
+                        >
+                          <CreditCard className="mr-3 h-5 w-5" />
+                          <span className="text-sm font-medium">Payments</span>
+                        </Link>
+                        
+                        <Link 
+                          to="/reviews" 
+                          className="flex items-center px-4 py-3 hover:bg-accent"
+                          onClick={() => toggleMobileMenu()}
+                        >
+                          <Star className="mr-3 h-5 w-5" />
+                          <span className="text-sm font-medium">Reviews</span>
+                        </Link>
+                      </>
+                    )}
+                    
+                    {/* Show Dashboard for sellers */}
+                    {user?.user_metadata?.account_type === 'seller' && (
+                      <Link 
+                        to="/seller/dashboard" 
+                        className="flex items-center px-4 py-3 hover:bg-accent"
+                        onClick={() => toggleMobileMenu()}
+                      >
+                        <ShoppingBag className="mr-3 h-5 w-5" />
+                        <span className="text-sm font-medium">Seller Dashboard</span>
+                      </Link>
+                    )}
+                  </>
+                )}
+                
+                {/* Categories section */}
+                <div className="px-4 py-2 mt-2">
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Categories</h3>
+                </div>
+                
+                {categories.map((category) => (
+                  <Link 
+                    key={category.name}
+                    to={category.href} 
+                    className="flex items-center px-4 py-3 hover:bg-accent"
+                    onClick={() => toggleMobileMenu()}
+                  >
+                    <span className="text-sm font-medium">{category.name}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+            
+            {/* Mobile menu footer */}
+            <div className="border-t p-4">
+              {isSignedIn ? (
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={(e) => {
+                    handleSignOut(e);
+                    toggleMobileMenu();
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign out
+                </Button>
+              ) : (
+                <Link to="/auth" className="w-full" onClick={() => toggleMobileMenu()}>
+                  <Button variant="default" className="w-full">
+                    Sign In
+                  </Button>
+                </Link>
+              )}
+              
+              {/* Theme toggle for mobile */}
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-sm font-medium">Theme</span>
+                <ThemeToggle />
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </header>
   );
 };
