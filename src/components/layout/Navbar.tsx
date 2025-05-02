@@ -12,7 +12,13 @@ import {
   ShoppingBag,
   MessageSquare,
   CreditCard,
-  Star
+  Star,
+  BarChart2,
+  Package,
+  Boxes,
+  Users,
+  Tag,
+  Settings
 } from 'lucide-react';
 import {
   Sheet,
@@ -46,6 +52,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import NotificationsMenu from '@/components/notifications/NotificationsMenu';
 import { useMobileMenu } from '@/context/MobileMenuContext';
+import BuyerSidebar from '@/components/buyer/BuyerSidebar';
 
 const categories = [
   { name: "Textiles & Clothing", href: "/category/textiles-clothing" },
@@ -69,7 +76,22 @@ const Navbar = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   
   // Use our shared mobile menu context
-  const { isOpen: mobileMenuOpen, toggle: toggleMobileMenu } = useMobileMenu();
+  const { isOpen: mobileMenuOpen, toggle: toggleMobileMenu, setIsOpen: setMobileMenuOpen, drawerType, setDrawerType } = useMobileMenu();
+
+  // Check if we're in a buyer route
+  const isBuyerRoute = location.pathname.startsWith('/buyer');
+  const isProductRoute = location.pathname.startsWith('/product');
+  const isArtisanRoute = location.pathname.startsWith('/artisan');
+  const shouldUseBuyerDrawer = isBuyerRoute || isProductRoute || isArtisanRoute;
+
+  // Update drawer type when route changes
+  useEffect(() => {
+    if (shouldUseBuyerDrawer) {
+      setDrawerType('buyer');
+    } else {
+      setDrawerType('main');
+    }
+  }, [location.pathname, shouldUseBuyerDrawer, setDrawerType]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -109,116 +131,68 @@ const Navbar = () => {
           return;
         }
         
-        // If account_type is not set, check if the user has a seller profile
+        // Otherwise, check seller_profiles table to determine if user is a seller
         try {
-          const { data: sellerProfile } = await supabase
+          const { data: sellerProfile, error } = await supabase
             .from('seller_profiles')
             .select('id')
             .eq('id', session.user.id)
             .single();
           
-          // If user has a seller profile, they are likely a seller
-          if (sellerProfile) {
+          // If we find a seller profile, user is NOT a buyer (they're a seller)
+          if (sellerProfile && !error) {
+            console.log("User identified as seller from database");
             setIsBuyer(false);
-            console.log("User identified as seller from seller_profiles table");
           } else {
-            // Default to buyer if no seller profile exists
+            // Default: If no seller profile, assume the user is a buyer
+            console.log("User identified as buyer (default)");
             setIsBuyer(true);
-            console.log("User defaulted to buyer (no seller profile found)");
           }
         } catch (error) {
-          console.log("Error checking seller profile:", error);
-          // If there's an error, default to showing the cart (assume buyer)
+          console.error("Error checking seller profile:", error);
+          // Default to buyer if there was an error
           setIsBuyer(true);
-          console.log("User defaulted to buyer due to error");
         }
-      } else {
-        setUser(null);
-        setIsSignedIn(false);
-        setIsBuyer(false);
       }
     });
 
-    // Set up auth listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth state changed:", event);
-      if (session) {
-        setUser(session.user);
-        setIsSignedIn(true);
-        
-        // We'll handle this in the same way as above but in a separate function
-        checkIfUserIsBuyer(session);
-      } else {
-        setUser(null);
-        setIsSignedIn(false);
-        setIsBuyer(false);
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          setUser(session.user);
+          setIsSignedIn(true);
+          
+          // Extract account type from user metadata
+          const accountType = session.user.user_metadata?.account_type;
+          if (accountType) {
+            setIsBuyer(accountType.toLowerCase() === 'buyer');
+          } else {
+            // Default to buyer if no account type specified
+            setIsBuyer(true);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setIsSignedIn(false);
+          setIsBuyer(false);
+        }
       }
-    });
+    );
 
     return () => {
       subscription.unsubscribe();
     };
   }, []);
 
-  // Helper function to determine if user is a buyer
-  const checkIfUserIsBuyer = async (session) => {
-    // First, check user metadata for account type
-    const accountType = session.user.user_metadata?.account_type;
-    console.log("Account type from metadata in auth change:", accountType);
-    
-    // If account_type is explicitly set to 'seller', the user is not a buyer
-    if (accountType && accountType.toLowerCase() === 'seller') {
-      setIsBuyer(false);
-      console.log("User identified as seller from metadata in auth change");
-      return;
-    }
-    
-    // If account_type is explicitly set to 'buyer', the user is a buyer
-    if (accountType && accountType.toLowerCase() === 'buyer') {
-      setIsBuyer(true);
-      console.log("User identified as buyer from metadata in auth change");
-      return;
-    }
-    
-    // If account_type is not set, check if the user has a seller profile
+  const handleSignOut = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
     try {
-      const { data: sellerProfile } = await supabase
-        .from('seller_profiles')
-        .select('id')
-        .eq('id', session.user.id)
-        .single();
-      
-      // If user has a seller profile, they are likely a seller
-      if (sellerProfile) {
-        setIsBuyer(false);
-        console.log("User identified as seller from seller_profiles table in auth change");
-      } else {
-        // Default to buyer if no seller profile exists
-        setIsBuyer(true);
-        console.log("User defaulted to buyer (no seller profile found) in auth change");
-      }
-    } catch (error) {
-      console.log("Error checking seller profile in auth change:", error);
-      // If there's an error, default to showing the cart (assume buyer)
-      setIsBuyer(true);
-      console.log("User defaulted to buyer due to error in auth change");
-    }
-  };
-
-  const handleSignOut = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      setUser(null);
-      setIsSignedIn(false);
-      setIsBuyer(false);
-      
-      toast.success('Successfully signed out');
+      await supabase.auth.signOut();
+      toast.success('You have been signed out');
       navigate('/');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to sign out');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast.error('Failed to sign out. Please try again.');
     }
   };
 
@@ -226,7 +200,7 @@ const Navbar = () => {
     if (!name) return 'U';
     return name
       .split(' ')
-      .map(n => n[0])
+      .map((n) => n[0])
       .join('')
       .toUpperCase()
       .substring(0, 2);
@@ -244,8 +218,13 @@ const Navbar = () => {
       <div className="container mx-auto px-4 flex items-center justify-between">
         <Link 
           to="/" 
-          className="text-xl md:text-2xl font-medium tracking-tight"
+          className="flex items-center gap-2 text-xl md:text-2xl font-medium tracking-tight"
         >
+          <img 
+            src="/logo (1).svg" 
+            alt="LokalNest Logo" 
+            className="h-6 md:h-8"
+          />
           <span className="text-gradient dark:text-white">LokalNest</span>
         </Link>
 
@@ -298,16 +277,6 @@ const Navbar = () => {
 
         {/* User actions */}
         <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-          {/* Search button - responsive sizing */}
-          <Button 
-            variant="ghost" 
-            size="icon"
-            className="h-8 w-8 md:h-9 md:w-9" 
-            onClick={() => setSearchOpen(true)}
-          >
-            <Search className="h-4 w-4 md:h-5 md:w-5" />
-          </Button>
-          
           {/* Shopping cart - show for buyers only (not on homepage or auth routes) */}
           {isBuyer && 
            location.pathname !== '/' && 
@@ -379,8 +348,8 @@ const Navbar = () => {
             </DropdownMenu>
           ) : (
             <>
-              {/* For mobile, show sign in button in the mobile menu */}
-              <Link to="/auth" className="hidden md:block">
+              {/* Show sign in button on both mobile and desktop */}
+              <Link to="/auth">
                 <Button variant="default" size="sm" className="ml-4">
                   Sign In
                 </Button>
@@ -388,179 +357,265 @@ const Navbar = () => {
             </>
           )}
           
-          {/* Mobile menu button - now using our context */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={toggleMobileMenu}
-            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-          >
-            {mobileMenuOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
-            )}
-          </Button>
+          {/* Mobile menu button - hide on root route, auth routes, and verify routes */}
+          {location.pathname !== '/' && !location.pathname.includes('/auth') && !location.pathname.includes('/verify') && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={toggleMobileMenu}
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            >
+              {mobileMenuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Mobile Menu Sheet */}
-      <Sheet open={mobileMenuOpen} onOpenChange={setIsOpen => {
-        if (!setIsOpen) toggleMobileMenu();
-      }}>
-        <SheetContent side="left" className="w-[80%] max-w-[300px] sm:max-w-sm p-0">
-          <div className="flex flex-col h-full">
-            {/* Mobile menu header */}
-            <div className="p-4 border-b">
-              <div className="flex items-center justify-between">
-                <Link 
-                  to="/" 
-                  className="text-xl font-medium tracking-tight"
-                  onClick={() => toggleMobileMenu()}
-                >
-                  <span className="text-gradient dark:text-white">LokalNest</span>
-                </Link>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={toggleMobileMenu}
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-            
-            {/* Mobile menu content */}
-            <div className="flex-1 overflow-auto py-2">
-              <div className="flex flex-col space-y-1">
-                {/* Show Home link */}
-                <Link 
-                  to="/" 
-                  className="flex items-center px-4 py-3 hover:bg-accent"
-                  onClick={() => toggleMobileMenu()}
-                >
-                  <Home className="mr-3 h-5 w-5" />
-                  <span className="text-sm font-medium">Home</span>
-                </Link>
-                
-                {/* Show Profile for signed in users */}
-                {isSignedIn && user && (
-                  <>
-                    {/* Profile link */}
+      {/* Mobile Menu Sheet - Only render when not on root route */}
+      {location.pathname !== '/' && (
+        <Sheet open={mobileMenuOpen} onOpenChange={setIsOpen => {
+          if (!setIsOpen) toggleMobileMenu();
+        }}>
+          <SheetContent side="left" className="w-[80%] max-w-[300px] sm:max-w-sm p-0">
+            {/* Conditional Drawer Content - Either Buyer Portal or Main Menu */}
+            {drawerType === 'buyer' ? (
+              <BuyerSidebar 
+                inDrawer={true} 
+                isOpen={mobileMenuOpen} 
+                onOpenChange={setMobileMenuOpen} 
+              />
+            ) : (
+              <div className="flex flex-col h-full">
+                {/* Mobile menu header */}
+                <div className="p-4 border-b">
+                  <div className="flex items-center justify-between">
                     <Link 
-                      to="/profile" 
-                      className="flex items-center px-4 py-3 hover:bg-accent"
+                      to="/" 
+                      className="flex items-center gap-2 text-xl font-medium tracking-tight"
                       onClick={() => toggleMobileMenu()}
                     >
-                      <User className="mr-3 h-5 w-5" />
-                      <span className="text-sm font-medium">Profile</span>
+                      <img 
+                        src="/logo (1).svg" 
+                        alt="LokalNest Logo" 
+                        className="h-6"
+                      />
+                      <span className="text-gradient dark:text-white">LokalNest</span>
                     </Link>
+                  </div>
+                </div>
+              
+                {/* Mobile menu content */}
+                <div className="flex-1 overflow-auto py-2">
+                  <div className="flex flex-col space-y-1">
+                    {/* Show Home link for everyone except sellers */}
+                    {user?.user_metadata?.account_type !== 'seller' && (
+                      <Link 
+                        to="/" 
+                        className="flex items-center px-4 py-3 hover:bg-accent"
+                        onClick={() => toggleMobileMenu()}
+                      >
+                        <Home className="mr-3 h-5 w-5" />
+                        <span className="text-sm font-medium">Home</span>
+                      </Link>
+                    )}
                     
-                    {/* Show Orders for buyers */}
-                    {(isBuyer || user?.user_metadata?.account_type !== 'seller') && (
+                    {/* Show Profile for signed in users who are not sellers */}
+                    {isSignedIn && user && (
                       <>
+                        {/* Profile link - only show for buyers or non-sellers */}
+                        {(isBuyer || user?.user_metadata?.account_type !== 'seller') && (
+                          <Link 
+                            to="/profile" 
+                            className="flex items-center px-4 py-3 hover:bg-accent"
+                            onClick={() => toggleMobileMenu()}
+                          >
+                            <User className="mr-3 h-5 w-5" />
+                            <span className="text-sm font-medium">Profile</span>
+                          </Link>
+                        )}
+                        
+                        {/* Show Orders for buyers */}
+                        {(isBuyer || user?.user_metadata?.account_type !== 'seller') && (
+                          <>
+                            <Link 
+                              to="/buyer/home" 
+                              className="flex items-center px-4 py-3 hover:bg-accent"
+                              onClick={() => toggleMobileMenu()}
+                            >
+                              <ShoppingBag className="mr-3 h-5 w-5" />
+                              <span className="text-sm font-medium">My Orders</span>
+                            </Link>
+                            
+                            <Link 
+                              to="/messages" 
+                              className="flex items-center px-4 py-3 hover:bg-accent"
+                              onClick={() => toggleMobileMenu()}
+                            >
+                              <MessageSquare className="mr-3 h-5 w-5" />
+                              <span className="text-sm font-medium">Messages</span>
+                            </Link>
+                            
+                            <Link 
+                              to="/payments" 
+                              className="flex items-center px-4 py-3 hover:bg-accent"
+                              onClick={() => toggleMobileMenu()}
+                            >
+                              <CreditCard className="mr-3 h-5 w-5" />
+                              <span className="text-sm font-medium">Payments</span>
+                            </Link>
+                            
+                            <Link 
+                              to="/reviews" 
+                              className="flex items-center px-4 py-3 hover:bg-accent"
+                              onClick={() => toggleMobileMenu()}
+                            >
+                              <Star className="mr-3 h-5 w-5" />
+                              <span className="text-sm font-medium">Reviews</span>
+                            </Link>
+                          </>
+                        )}
+                      </>
+                    )}
+                    
+                    {/* Categories section - replace with Seller Dashboard navigation for sellers */}
+                    <div className="px-4 py-2 mt-2">
+                      {user?.user_metadata?.account_type === 'seller' ? (
+                        <h3 className="text-sm font-medium text-muted-foreground mb-2">Seller Dashboard</h3>
+                      ) : (
+                        <h3 className="text-sm font-medium text-muted-foreground mb-2">Categories</h3>
+                      )}
+                    </div>
+                    
+                    {user?.user_metadata?.account_type === 'seller' ? (
+                      <div className="flex flex-col space-y-1">
                         <Link 
-                          to="/buyer/home" 
+                          to="/seller/dashboard/overview" 
                           className="flex items-center px-4 py-3 hover:bg-accent"
                           onClick={() => toggleMobileMenu()}
                         >
-                          <ShoppingBag className="mr-3 h-5 w-5" />
-                          <span className="text-sm font-medium">My Orders</span>
+                          <BarChart2 className="mr-3 h-5 w-5" />
+                          <span className="text-sm font-medium">Overview</span>
                         </Link>
-                        
                         <Link 
-                          to="/messages" 
+                          to="/seller/dashboard/products" 
+                          className="flex items-center px-4 py-3 hover:bg-accent"
+                          onClick={() => toggleMobileMenu()}
+                        >
+                          <Package className="mr-3 h-5 w-5" />
+                          <span className="text-sm font-medium">Products</span>
+                        </Link>
+                        <Link 
+                          to="/seller/dashboard/inventory" 
+                          className="flex items-center px-4 py-3 hover:bg-accent"
+                          onClick={() => toggleMobileMenu()}
+                        >
+                          <Boxes className="mr-3 h-5 w-5" />
+                          <span className="text-sm font-medium">Inventory</span>
+                        </Link>
+                        <Link 
+                          to="/seller/dashboard/orders" 
+                          className="flex items-center px-4 py-3 hover:bg-accent"
+                          onClick={() => toggleMobileMenu()}
+                        >
+                          <ShoppingCart className="mr-3 h-5 w-5" />
+                          <span className="text-sm font-medium">Orders</span>
+                        </Link>
+                        <Link 
+                          to="/seller/dashboard/messages" 
                           className="flex items-center px-4 py-3 hover:bg-accent"
                           onClick={() => toggleMobileMenu()}
                         >
                           <MessageSquare className="mr-3 h-5 w-5" />
                           <span className="text-sm font-medium">Messages</span>
                         </Link>
-                        
                         <Link 
-                          to="/payments" 
+                          to="/seller/dashboard/customers" 
                           className="flex items-center px-4 py-3 hover:bg-accent"
                           onClick={() => toggleMobileMenu()}
                         >
-                          <CreditCard className="mr-3 h-5 w-5" />
-                          <span className="text-sm font-medium">Payments</span>
+                          <Users className="mr-3 h-5 w-5" />
+                          <span className="text-sm font-medium">Customers</span>
                         </Link>
-                        
                         <Link 
-                          to="/reviews" 
+                          to="/seller/dashboard/promotions" 
+                          className="flex items-center px-4 py-3 hover:bg-accent"
+                          onClick={() => toggleMobileMenu()}
+                        >
+                          <Tag className="mr-3 h-5 w-5" />
+                          <span className="text-sm font-medium">Promotions</span>
+                        </Link>
+                        <Link 
+                          to="/seller/dashboard/reviews" 
                           className="flex items-center px-4 py-3 hover:bg-accent"
                           onClick={() => toggleMobileMenu()}
                         >
                           <Star className="mr-3 h-5 w-5" />
                           <span className="text-sm font-medium">Reviews</span>
                         </Link>
-                      </>
+                        <Link 
+                          to="/seller/dashboard/settings" 
+                          className="flex items-center px-4 py-3 hover:bg-accent"
+                          onClick={() => toggleMobileMenu()}
+                        >
+                          <Settings className="mr-3 h-5 w-5" />
+                          <span className="text-sm font-medium">Settings</span>
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col space-y-1">
+                        {categories.map((category) => (
+                          <Link 
+                            key={category.name}
+                            to={category.href} 
+                            className="flex items-center px-4 py-3 hover:bg-accent"
+                            onClick={() => toggleMobileMenu()}
+                          >
+                            <span className="text-sm font-medium">{category.name}</span>
+                          </Link>
+                        ))}
+                      </div>
                     )}
-                    
-                    {/* Show Dashboard for sellers */}
-                    {user?.user_metadata?.account_type === 'seller' && (
-                      <Link 
-                        to="/seller/dashboard" 
-                        className="flex items-center px-4 py-3 hover:bg-accent"
-                        onClick={() => toggleMobileMenu()}
-                      >
-                        <ShoppingBag className="mr-3 h-5 w-5" />
-                        <span className="text-sm font-medium">Seller Dashboard</span>
-                      </Link>
-                    )}
-                  </>
-                )}
-                
-                {/* Categories section */}
-                <div className="px-4 py-2 mt-2">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Categories</h3>
+                  </div>
                 </div>
                 
-                {categories.map((category) => (
-                  <Link 
-                    key={category.name}
-                    to={category.href} 
-                    className="flex items-center px-4 py-3 hover:bg-accent"
-                    onClick={() => toggleMobileMenu()}
-                  >
-                    <span className="text-sm font-medium">{category.name}</span>
-                  </Link>
-                ))}
+                {/* Mobile menu footer */}
+                <div className="border-t p-4">
+                  {isSignedIn ? (
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={(e) => {
+                        handleSignOut(e);
+                        toggleMobileMenu();
+                      }}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Sign out
+                    </Button>
+                  ) : (
+                    <Link to="/auth" className="w-full" onClick={() => toggleMobileMenu()}>
+                      <Button variant="default" className="w-full">
+                        Sign In
+                      </Button>
+                    </Link>
+                  )}
+                  
+                  {/* Theme toggle for mobile */}
+                  <div className="flex items-center justify-between mt-4">
+                    <span className="text-sm font-medium">Theme</span>
+                    <ThemeToggle />
+                  </div>
+                </div>
               </div>
-            </div>
-            
-            {/* Mobile menu footer */}
-            <div className="border-t p-4">
-              {isSignedIn ? (
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={(e) => {
-                    handleSignOut(e);
-                    toggleMobileMenu();
-                  }}
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sign out
-                </Button>
-              ) : (
-                <Link to="/auth" className="w-full" onClick={() => toggleMobileMenu()}>
-                  <Button variant="default" className="w-full">
-                    Sign In
-                  </Button>
-                </Link>
-              )}
-              
-              {/* Theme toggle for mobile */}
-              <div className="flex items-center justify-between mt-4">
-                <span className="text-sm font-medium">Theme</span>
-                <ThemeToggle />
-              </div>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+            )}
+          </SheetContent>
+        </Sheet>
+      )}
     </header>
   );
 };

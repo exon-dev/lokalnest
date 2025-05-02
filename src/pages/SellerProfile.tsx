@@ -181,7 +181,7 @@ const SellerProfilePage = () => {
         </div>
 
         {/* Profile header */}
-        <div className="bg-white border rounded-lg shadow-sm p-6 mb-8">
+        <div className="bg-card text-card-foreground border rounded-lg shadow-sm p-6 mb-8">
           <div className="flex flex-col md:flex-row gap-6">
             <div className="flex-shrink-0">
               <img 
@@ -196,7 +196,7 @@ const SellerProfilePage = () => {
                 <h1 className="text-2xl font-semibold">{seller.business_name}</h1>
                 <Button 
                   onClick={handleMessageSeller} 
-                  className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   <MessageSquare className="h-4 w-4" />
                   Message Seller
