@@ -50,6 +50,10 @@ const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
         (e.target as HTMLElement).closest('[data-cancel-button]')) {
       return;
     }
+    // Add debug logging to see the address data when opening the modal
+    console.log('Order details opened with data:', order);
+    console.log('Address data:', order.addresses);
+    console.log('Phone data:', order.phone);
     setIsOrderDetailsOpen(true);
   };
 
@@ -318,21 +322,22 @@ const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
                 <h3 className="text-lg font-medium mb-2">Shipping Information</h3>
                 <div className="border rounded-md p-4 space-y-2">
                   <div className="flex items-start space-x-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
+                    <MapPin className="h-6 w-6 mt-1.5 flex-shrink-0" />
                     <div>
                       <p className="font-medium">Delivery Address</p>
                       <p className="text-sm text-muted-foreground">
-                        123 San Pedro St., Barangay San Jose, Quezon City,
-                        Metro Manila, 1100 Philippines
+                        {order.addresses ? 
+                          `${order.addresses.address_line1}${order.addresses.address_line2 ? ', ' + order.addresses.address_line2 : ''}, ${order.addresses.city}, ${order.addresses.state}, ${order.addresses.postal_code} ${order.addresses.country}` :
+                          "No address provided"}
                       </p>
                     </div>
                   </div>
                   
                   <div className="flex items-start space-x-2">
-                    <Phone className="h-4 w-4 text-muted-foreground mt-1" />
+                    <Phone className="h-6 w-6 mt-0.5" />
                     <div>
                       <p className="font-medium">Contact Number</p>
-                      <p className="text-sm text-muted-foreground">+63 912 345 6789</p>
+                      <p className="text-sm text-muted-foreground">{order.phone || "No contact number provided"}</p>
                     </div>
                   </div>
                 </div>

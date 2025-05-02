@@ -412,10 +412,11 @@ const ProductDetail = () => {
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button
-                  className="flex-1"
+                  className="flex-1 py-3 h-[30px] sm:h-11 text-base"
                   size="lg"
                   onClick={handleAddToCart}
                   disabled={product.stock_quantity === 0}
+                  style={{ minHeight: '40px' }}
                 >
                   <ShoppingCart className="mr-2 h-5 w-5" />
                   Add to Cart

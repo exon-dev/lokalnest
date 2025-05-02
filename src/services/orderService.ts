@@ -380,6 +380,28 @@ export async function getOrders(): Promise<BuyerOrder[]> {
     if (ordersError) {
       throw new Error(`Failed to fetch orders: ${ordersError.message}`);
     }
+
+    // Get user's address and profile data
+    const { data: userAddresses, error: addressError } = await supabase
+      .from('addresses')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    // If no addresses found or there was an error, log it
+    if (addressError) {
+      console.error('Error fetching user address:', addressError);
+    }
+    
+    // Debug log for address data
+    console.log('User address data:', userAddresses);
+    
+    // Get user's profile data for the phone number
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('phone')
+      .eq('id', user.id)
+      .maybeSingle();
     
     // Fetch product details separately to avoid the relationship conflict
     const orderWithItems = await Promise.all((orders || []).map(async (order: any) => {
@@ -400,8 +422,8 @@ export async function getOrders(): Promise<BuyerOrder[]> {
           
         return {
           name: product?.name || 'Product Name Unavailable',
-        quantity: item.quantity,
-        price: item.unit_price,
+          quantity: item.quantity,
+          price: item.unit_price,
           image: images && images.length > 0 ? images[0].url : '',
           product_id: item.product_id // Include the product_id in the returned item
         };
@@ -415,6 +437,24 @@ export async function getOrders(): Promise<BuyerOrder[]> {
         status: order.status,
         paymentStatus: order.payment_status,
         paymentMethod: order.payment_method,
+        // Include address and phone data from the user's default address and profile
+        addresses: userAddresses ? {
+          address_line1: userAddresses.address_line1,
+          address_line2: userAddresses.address_line2 || '',
+          city: userAddresses.city,
+          state: userAddresses.state,
+          postal_code: userAddresses.postal_code,
+          country: userAddresses.country
+        } : {
+          // Provide an empty address object instead of null
+          address_line1: '',
+          address_line2: '',
+          city: '',
+          state: '',
+          postal_code: '',
+          country: ''
+        },
+        phone: userProfile?.phone || null,
         tracking: order.tracking_number ? {
           id: order.tracking_number,
           courier: 'Shipping Partner',

@@ -30,6 +30,7 @@ import Profile from './pages/Profile';
 import InventoryManagementNew from './components/seller/InventoryManagementNew';
 import SellerMessagesDashboard from './pages/SellerMessagesDashboard';
 import { MobileMenuProvider } from './context/MobileMenuContext';
+// import SellerMobileMenu from './components/seller/SellerMobileMenu';
 
 function App() {
   return (
@@ -59,6 +60,7 @@ function App() {
                   <Route path="reviews" element={<ReviewManagement />} />
                   <Route path="settings" element={<SellerSettings />} />
                 </Route>
+                {/* <Route path="mobile-menu" element={<SellerMobileMenu />} /> */}
               </Route>
               
               {/* Buyer Routes */}

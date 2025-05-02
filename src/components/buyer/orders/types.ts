@@ -21,6 +21,15 @@ export interface OrderTracking {
   updates: TrackingUpdate[];
 }
 
+export interface Address {
+  address_line1: string;
+  address_line2?: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
+}
+
 export interface Order {
   id: string;
   date: string;
@@ -28,6 +37,8 @@ export interface Order {
   total: number;
   status: 'processing' | 'shipped' | 'delivered' | 'cancelled';
   tracking?: OrderTracking;
+  addresses: Address;  // Changed from address to addresses
+  phone: string;
 }
 
 // Modified to accept string status that will be cast to the required type
@@ -40,6 +51,17 @@ export type RawOrder = {
   tracking_url?: string;
   estimated_delivery?: string;
   buyer_id: string;
+  addresses?: {  // Changed from address to addresses
+    address_line1: string;
+    address_line2?: string;
+    city: string;
+    state: string;
+    postal_code: string;
+    country: string;
+  };
+  profile?: {
+    phone: string;
+  };
 }
 
 export type RawOrderItem = {

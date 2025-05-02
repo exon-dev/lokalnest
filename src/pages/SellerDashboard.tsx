@@ -148,7 +148,8 @@ const SellerDashboard = () => {
             {/* Content Area */}
             <div className="col-span-1 lg:col-span-9">
               <Tabs value={getActiveTab()} className="w-full" onValueChange={handleTabChange}>
-                <TabsList className="w-full mb-6 overflow-x-auto flex sm:grid sm:grid-cols-9">
+                {/* Hide TabsList on mobile since we already have sidebar drawer for mobile navigation */}
+                <TabsList className="w-full mb-6 overflow-x-auto hidden md:flex md:sm:grid md:sm:grid-cols-9">
                   <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
                   <TabsTrigger 
                     value="products" 
