@@ -231,29 +231,21 @@ const Checkout: React.FC = () => {
           console.error('COD order creation error:', codError);
           toast.error(codError.message || 'Failed to place your COD order. Please try again.');
         }
-      } else if (paymentMethod === 'stripe' && paymentIntentId) {
-        // For Stripe, the payment is processed by the StripeCardElement component
-        // Here we just create the order with the payment_intent_id
-        try {
-          // Add payment intent ID to the order data
-          const stripeOrderData = {
-            ...orderData,
-            payment_intent_id: paymentIntentId
-          };
-          
-          const orderId = await createOrder(stripeOrderData, selectedItems);
-          
-          // We'll update the order status when the payment succeeds
-          // This is handled in the onPaymentSuccess callback
-        } catch (stripeError: any) {
-          console.error('Stripe order creation error:', stripeError);
-          toast.error(stripeError.message || 'Failed to process your card payment. Please try again.');
+      } else if (paymentMethod === 'stripe') {
+        // For Stripe, StripeCardElement component handles the payment
+        // Don't create the order here - it will be created in onPaymentSuccess
+        console.log('Ready for Stripe payment processing with client secret:', clientSecret ? 'Present' : 'Missing');
+        
+        // The StripeCardElement will handle payment and call onPaymentSuccess/onPaymentError
+        if (!clientSecret) {
+          toast.error('Payment system is not ready yet. Please try again.');
+          setIsProcessing(false);
         }
+        // Otherwise, let the StripeCardElement handle it
       }
     } catch (error: any) {
       console.error('General checkout error:', error);
       toast.error(error.message || 'There was a problem processing your order. Please try again.');
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -275,23 +267,38 @@ const Checkout: React.FC = () => {
         shipping_address: formattedAddress,
         billing_address: formattedAddress,
         payment_method: 'stripe',
-        payment_intent_id: completedPaymentIntentId,
+        payment_intent_id: completedPaymentIntentId, // This will be stored in payment_method column as stripe:paymentIntentId
         payment_status: 'succeeded',
         total_amount: totalWithShipping,
         delivery_option: selectedDeliveryOption,
         estimated_delivery: estimatedDelivery
       };
       
-      // Create the order with the completed payment intent ID
-      const orderId = await createOrder(orderData, selectedItems);
+      console.log('Creating order after successful payment:', completedPaymentIntentId);
       
-      // The order has been created and the payment has been processed
-      toast.success('Payment successful! Your order has been placed.');
-      clearCart();
-      navigate('/buyer/orders');
-    } catch (error) {
-      toast.error('Payment was successful, but there was an issue creating your order.');
+      try {
+        // Create the order with the completed payment intent ID
+        const orderId = await createOrder(orderData, selectedItems);
+        
+        if (!orderId) {
+          throw new Error('Failed to create order: No order ID returned');
+        }
+        
+        console.log('Order created successfully:', orderId);
+        
+        // The order has been created and the payment has been processed
+        toast.success('Payment successful! Your order has been placed.');
+        clearCart();
+        navigate('/buyer/orders');
+      } catch (orderError: any) {
+        console.error('Failed to create order after payment:', orderError);
+        toast.error(orderError.message || 'Payment was successful, but there was an issue creating your order.');
+        setIsProcessing(false);
+      }
+    } catch (error: any) {
       console.error('Error after payment:', error);
+      toast.error('Payment was successful, but there was an issue creating your order.');
+      setIsProcessing(false);
     }
   };
   

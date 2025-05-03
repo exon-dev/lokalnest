@@ -16,19 +16,21 @@ export type OrderStatus = 'pending' | 'payment_approved' | 'processing' | 'shipp
 export interface Order {
   id: string;
   buyer_id: string;
-  seller_id: string;
-  product_ids: string[];
+  seller_id: string | null;
+  product_ids?: string[]; // This is a virtual field not in the actual table
   status: OrderStatus;
   total_amount: number;
   created_at: string;
   updated_at: string;
   payment_method: string;
+  payment_status?: string;
   shipping_address: string;
   billing_address: string;
-  payment_status?: string;
   estimated_delivery?: string;
   tracking_number?: string;
+  tracking_url?: string;
   delivery_option?: string;
+  payment_intent_id?: string; // This might be stored in a separate column or in metadata
 }
 
 // Get orders for the current user (as a buyer)
@@ -113,7 +115,8 @@ export async function createOrder(orderData: Partial<Order>, cartItems?: CartIte
     orderData.buyer_id = user.id;
     
     // Default values
-    orderData.status = 'pending';
+    orderData.status = 'pending'; // Order status starts as pending
+    orderData.payment_status = orderData.payment_status || 'pending'; // Default payment status
     orderData.created_at = new Date().toISOString();
     orderData.updated_at = new Date().toISOString();
     
@@ -133,14 +136,41 @@ export async function createOrder(orderData: Partial<Order>, cartItems?: CartIte
       throw new Error('Billing address is required');
     }
 
+    // Handle different payment methods
+    if (orderData.payment_method === 'stripe') {
+      // If this is a Stripe payment that succeeded, update payment status
+      if (orderData.payment_status === 'succeeded') {
+        // Payment is successful, but order is still waiting for seller to process
+        orderData.payment_status = 'paid';
+        // Order status remains 'pending' until seller approves it
+      }
+      
+      // Now we can store the payment_intent_id in its own column
+      // Change payment_method to just 'stripe' for clarity
+      orderData.payment_method = 'Credit Card';
+    } else if (orderData.payment_method === 'cod') {
+      // For COD, payment status is 'pending' until delivery
+      orderData.payment_status = 'pending';
+    }
+
+    // The payment_intent_id is now properly stored in the database column
+    // No need to remove it from the data object
+
     // Use the single() method to ensure column references are not ambiguous
     const { data, error } = await supabase
       .from('orders')
-      .insert(orderData as any)
+      .insert(orderData)
       .select('id')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Database error while creating order:', error);
+      throw new Error(`Failed to create order: ${error.message}`);
+    }
+    
+    if (!data || !data.id) {
+      throw new Error('Failed to create order: No ID returned');
+    }
 
     // Create order items if cart items are provided
     if (cartItems && cartItems.length > 0) {
