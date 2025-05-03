@@ -73,14 +73,14 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
         materials,
         tags,
         seller_id,
-        promotion_id,
         categories!inner(id, name, slug),
         seller_profiles!inner(
           id, 
           business_name, 
           logo_url, 
           location
-        )
+        ),
+        promotions(id, title, description, discount_type, discount_value)
       `)
       .eq('id', id)
       .single();
@@ -123,18 +123,10 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
       reviewCount = reviews.length;
     }
 
-    // Fetch promotion data if available
+    // Get promotion data if available
     let promotionData = null;
-    if (product.promotion_id) {
-      const { data: promotion, error: promotionError } = await supabase
-        .from('promotions')
-        .select('id, title, description, discount_type, discount_value')
-        .eq('id', product.promotion_id)
-        .single();
-        
-      if (!promotionError && promotion) {
-        promotionData = promotion;
-      }
+    if (product.promotions) {
+      promotionData = product.promotions;
     }
 
     // Format the data to match our expected structure
