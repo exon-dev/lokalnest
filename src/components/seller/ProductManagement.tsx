@@ -245,6 +245,53 @@ const ProductManagement = () => {
     }
     
     try {
+      // First check if the product has order items
+      const { data: orderItems, error: checkError } = await supabase
+        .from('order_items')
+        .select('id, order_id')
+        .eq('product_id', productId);
+      
+      if (orderItems && orderItems.length > 0) {
+        // Check if these are orphaned order items (orders are already deleted)
+        const orderIds = [...new Set(orderItems.map(item => item.order_id))];
+        
+        const { data: existingOrders } = await supabase
+          .from('orders')
+          .select('id')
+          .in('id', orderIds);
+        
+        if (existingOrders && existingOrders.length > 0) {
+          // Orders still exist, cannot delete
+          toast.error('Cannot delete product because it has orders. Consider setting it as unavailable instead.');
+          return;
+        } else {
+          // Orders are gone but order_items still exist - these are orphaned records
+          // Delete the orphaned order items
+          const { error: deleteItemsError } = await supabase
+            .from('order_items')
+            .delete()
+            .eq('product_id', productId);
+          
+          if (deleteItemsError) {
+            console.error('Error deleting orphaned order items:', deleteItemsError);
+            toast.error('Failed to delete product - could not clean up order records');
+            return;
+          }
+        }
+      }
+      
+      // Delete related product images
+      const { error: imageDeleteError } = await supabase
+        .from('product_images')
+        .delete()
+        .eq('product_id', productId);
+      
+      if (imageDeleteError) {
+        console.error('Error deleting product images:', imageDeleteError);
+        throw imageDeleteError;
+      }
+      
+      // Finally delete the product itself
       const { error } = await supabase
         .from('products')
         .delete()
@@ -252,6 +299,7 @@ const ProductManagement = () => {
         
       if (error) throw error;
       
+      // Update local state
       setProducts(products.filter(product => product.id !== productId));
       toast.success("Product deleted successfully");
     } catch (error) {
