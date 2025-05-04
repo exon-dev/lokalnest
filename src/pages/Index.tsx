@@ -101,7 +101,7 @@ const Index = () => {
             subtitle="Browse our diverse range of locally-crafted products"
             categories={categories}
           />
-          <ProducerSpotlight producers={producers} />
+          {/* <ProducerSpotlight producers={producers} /> */}
           <Features />
         </div>
       </div>

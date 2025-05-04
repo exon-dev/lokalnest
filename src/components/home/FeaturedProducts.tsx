@@ -47,6 +47,11 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({
     e.preventDefault();
     navigate('/auth');
   };
+  
+  const handleViewAllClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate('/auth');
+  };
 
   return (
     <section id="featured-products" className="py-16">
@@ -57,12 +62,12 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({
             {subtitle && <p className="text-muted-foreground max-w-2xl">{subtitle}</p>}
           </div>
           {viewAllLink && (
-            <Link to={viewAllLink} className="mt-4 md:mt-0">
+            <a href="#" onClick={handleViewAllClick} className="mt-4 md:mt-0">
               <Button variant="outline" className="group">
                 View All
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Button>
-            </Link>
+            </a>
           )}
         </div>
 
