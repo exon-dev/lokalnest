@@ -88,29 +88,29 @@ const SellerVerification = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-12 pb-20">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-12 pb-20">
       <div className="container mx-auto">
         {isVerified ? (
-          <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md text-center">
+          <div className="max-w-2xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md text-center">
             <h1 className="text-2xl font-bold mb-4">Already Verified</h1>
-            <p className="mb-6">Your seller account has already been verified. You can now start listing products.</p>
+            <p className="mb-6 text-muted-foreground">Your seller account has already been verified. You can now start listing products.</p>
             <button 
               onClick={() => navigate('/seller/dashboard')}
-              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800"
             >
               Go to Dashboard
             </button>
           </div>
         ) : hasPendingVerification ? (
-          <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md text-center">
+          <div className="max-w-2xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md text-center">
             <h1 className="text-2xl font-bold mb-4">Verification Pending</h1>
-            <p className="mb-6">
+            <p className="mb-6 text-muted-foreground">
               Your verification documents have been submitted and are pending review by our admin team.
               You will be notified once your account is verified.
             </p>
             <button 
               onClick={() => navigate('/seller/dashboard')}
-              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800"
             >
               Go to Dashboard
             </button>

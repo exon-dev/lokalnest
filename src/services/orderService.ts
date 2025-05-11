@@ -156,10 +156,29 @@ export async function createOrder(orderData: Partial<Order>, cartItems?: CartIte
     // The payment_intent_id is now properly stored in the database column
     // No need to remove it from the data object
 
+    // Create a new object with the required fields that are guaranteed to be present after validation
+    const validatedOrderData = {
+      buyer_id: orderData.buyer_id!,
+      seller_id: orderData.seller_id,
+      status: orderData.status!,
+      total_amount: orderData.total_amount || 0,
+      created_at: orderData.created_at!,
+      updated_at: orderData.updated_at!,
+      payment_method: orderData.payment_method!,
+      payment_status: orderData.payment_status,
+      shipping_address: orderData.shipping_address!,
+      billing_address: orderData.billing_address!,
+      estimated_delivery: orderData.estimated_delivery,
+      tracking_number: orderData.tracking_number,
+      tracking_url: orderData.tracking_url,
+      delivery_option: orderData.delivery_option,
+      payment_intent_id: orderData.payment_intent_id
+    };
+
     // Use the single() method to ensure column references are not ambiguous
     const { data, error } = await supabase
       .from('orders')
-      .insert(orderData)
+      .insert(validatedOrderData)
       .select('id')
       .single();
 
@@ -189,6 +208,90 @@ export async function createOrder(orderData: Partial<Order>, cartItems?: CartIte
       if (itemsError) {
         console.error('Error creating order items:', itemsError);
         // Consider whether to roll back the order if items fail
+      }
+
+      // Update inventory stock for each product ordered
+      for (const item of cartItems) {
+        try {
+          // Get current stock quantity
+          const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('stock_quantity, seller_id')
+            .eq('id', item.id)
+            .single();
+
+          if (productError) {
+            console.error(`Error fetching product ${item.id} stock:`, productError);
+            continue; // Skip to next item if error occurs
+          }
+
+          if (!product) {
+            console.error(`Product ${item.id} not found`);
+            continue;
+          }
+
+          // Calculate new stock value after order
+          const previousQuantity = product.stock_quantity || 0;
+          const newQuantity = Math.max(0, previousQuantity - item.quantity);
+
+          // Update product stock
+          const { error: updateError } = await supabase
+            .from('products')
+            .update({ stock_quantity: newQuantity })
+            .eq('id', item.id);
+
+          if (updateError) {
+            console.error(`Error updating stock for product ${item.id}:`, updateError);
+            continue;
+          }
+
+          // Create an inventory log entry
+          const { error: logError } = await supabase
+            .from('inventory_logs')
+            .insert({
+              product_id: item.id,
+              previous_quantity: previousQuantity,
+              new_quantity: newQuantity,
+              change_quantity: -item.quantity, // Negative value as stock is decreasing
+              reason: `Order fulfillment (Order #${data.id.substr(0, 8)})`,
+              created_at: new Date().toISOString(),
+              created_by: product.seller_id // Use seller as the creator
+            });
+
+          if (logError) {
+            console.error(`Error creating inventory log for product ${item.id}:`, logError);
+          }
+
+          // Check if new quantity is at or below low stock threshold and notify seller if needed
+          const { data: productDetails } = await supabase
+            .from('products')
+            .select('name')
+            .eq('id', item.id)
+            .single();
+
+          if (productDetails) {
+            const threshold = 5; // Default threshold since low_stock_threshold column doesn't exist
+            if (newQuantity > 0 && newQuantity <= threshold) {
+              // Create low stock notification
+              await (supabase.rpc as any)('create_user_notification', {
+                p_user_id: product.seller_id,
+                p_type: 'low_stock',
+                p_title: `Low Stock Alert: ${productDetails.name}`,
+                p_message: `Your product "${productDetails.name}" is running low on stock. Current quantity: ${newQuantity} (threshold: ${threshold})`,
+                p_data: JSON.stringify({
+                  product_id: item.id,
+                  current_stock: newQuantity,
+                  threshold: threshold,
+                  order_id: data.id
+                }),
+                p_preference_key: 'stock_alerts'
+              });
+            }
+          }
+        } catch (stockError) {
+          console.error('Error updating inventory for order item:', stockError);
+          // Continue processing other items even if one fails
+        }
       }
     }
 

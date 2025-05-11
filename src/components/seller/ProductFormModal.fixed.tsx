@@ -358,6 +358,11 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       toast.error('Please fill in all required fields');
       return;
     }
+
+    if (formData.images.length === 0) {
+      toast.error('At least one product image is required');
+      return;
+    }
     
     // Parse numeric values
     const productData = {
@@ -630,7 +635,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {/* Product Images */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-medium text-muted-foreground">Product Images</h3>
+              <h3 className="text-sm font-medium text-muted-foreground">Product Images <span className="text-red-500">*</span></h3>
               <Button 
                 type="button" 
                 variant="outline" 
@@ -655,6 +660,10 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               />
             </div>
             
+            {formData.images.length === 0 && (
+              <div className="text-sm text-red-500 mb-2">At least one product image is required</div>
+            )}
+
             {formData.images.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {formData.images.map((image, index) => (
@@ -876,4 +885,4 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   );
 };
 
-export default ProductFormModal; 
+export default ProductFormModal;

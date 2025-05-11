@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -14,12 +14,16 @@ import {
   Plus,
   Minus,
   Loader2,
+  MessageSquare,
+  Calendar,
+  User
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/components/buyer/shopping/Cart';
-import { getProductById, ProductDetail as ProductDetailType } from '@/services/productService';
+import { getProductById, getProductReviews, ProductDetail as ProductDetailType, ProductReview } from '@/services/productService';
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 
 // Default delivery options for all products
 const deliveryOptions = [
@@ -37,6 +41,9 @@ const ProductDetail = () => {
   const [isLoadingImages, setIsLoadingImages] = useState(true);
   const [sellerRating, setSellerRating] = useState<number | null>(null);
   const [sellerReviewCount, setSellerReviewCount] = useState(0);
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const reviewsRef = useRef<HTMLDivElement>(null);
   const { addItem } = useCart();
 
   // Calculate discounted price based on promotion
@@ -105,6 +112,33 @@ const ProductDetail = () => {
     );
   };
 
+  // Scroll to reviews section
+  const scrollToReviews = () => {
+    if (reviewsRef.current) {
+      reviewsRef.current.scrollIntoView({ behavior: 'smooth' });
+      
+      // Load reviews if not loaded yet
+      if (reviews.length === 0 && !loadingReviews && product) {
+        loadReviews();
+      }
+    }
+  };
+  
+  // Load reviews for the current product
+  const loadReviews = async () => {
+    if (!id) return;
+    
+    setLoadingReviews(true);
+    try {
+      const reviewsData = await getProductReviews(id);
+      setReviews(reviewsData);
+    } catch (error) {
+      console.error('Error loading reviews:', error);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
   useEffect(() => {
     async function loadProduct() {
       if (!id) {
@@ -132,6 +166,11 @@ const ProductDetail = () => {
         // After we have the product data, get the seller's average rating
         if (productData.seller && productData.seller.id) {
           fetchSellerRating(productData.seller.id);
+        }
+        
+        // Load reviews if product has reviews
+        if (productData.review_count && productData.review_count > 0) {
+          loadReviews();
         }
       } catch (error) {
         console.error('Error loading product:', error);
@@ -213,6 +252,25 @@ const ProductDetail = () => {
     if (quantity > 1) {
       setQuantity(quantity - 1);
     }
+  };
+
+  // Render star rating component
+  const RatingStars = ({ rating }: { rating: number }) => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <Star 
+          key={i} 
+          className={cn(
+            "h-4 w-4", 
+            i <= rating 
+              ? "text-yellow-500 fill-yellow-500" 
+              : "text-gray-300"
+          )} 
+        />
+      );
+    }
+    return <div className="flex">{stars}</div>;
   };
 
   // Show loading state while fetching the product
@@ -338,9 +396,12 @@ const ProductDetail = () => {
                   <span className="ml-1 text-sm font-medium">{product.rating || 'No Rating'}</span>
                 </div>
                 <span className="mx-2 text-muted-foreground">•</span>
-                <Link to="#reviews" className="text-sm text-muted-foreground hover:text-foreground">
+                <button 
+                  onClick={scrollToReviews} 
+                  className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+                >
                   {product.review_count || 0} reviews
-                </Link>
+                </button>
                 <span className="mx-2 text-muted-foreground">•</span>
                 <span className="text-sm text-muted-foreground">
                   {product.stock_quantity > 0 ? 'In stock' : 'Out of stock'}
@@ -511,6 +572,74 @@ const ProductDetail = () => {
                     </span>
                   ))}
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Reviews section */}
+        <div ref={reviewsRef} id="reviews" className="mt-16 pt-4">
+          <h2 className="text-2xl font-semibold mb-6">Customer Reviews</h2>
+          
+          <div className="mb-8">
+            <div className="flex items-center mb-4">
+              <h3 className="text-lg font-medium">
+                {product?.rating || 0} out of 5
+              </h3>
+              <div className="ml-3 flex items-center">
+                {product?.rating && <RatingStars rating={product.rating} />}
+              </div>
+              <span className="ml-3 text-sm text-muted-foreground">
+                Based on {product?.review_count || 0} reviews
+              </span>
+            </div>
+          </div>
+          
+          {/* Reviews list */}
+          <div className="space-y-6">
+            {loadingReviews ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-3">Loading reviews...</span>
+              </div>
+            ) : reviews.length > 0 ? (
+              reviews.map(review => (
+                <div key={review.id} className="border-b border-border pb-6">
+                  <div className="flex items-start">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden mr-3">
+                      {review.user.avatar_url ? (
+                        <img 
+                          src={review.user.avatar_url} 
+                          alt={review.user.name} 
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <User className="h-5 w-5 text-primary" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">{review.user.name}</h4>
+                        <span className="text-sm text-muted-foreground flex items-center">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          {format(new Date(review.created_at), 'MMM d, yyyy')}
+                        </span>
+                      </div>
+                      <div className="flex items-center mt-1">
+                        <RatingStars rating={review.rating} />
+                      </div>
+                      <p className="mt-2 text-muted-foreground">{review.comment}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="py-12 text-center">
+                <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-40" />
+                <h3 className="text-lg font-medium mb-1">No Reviews Yet</h3>
+                <p className="text-muted-foreground">
+                  Be the first to review this product
+                </p>
               </div>
             )}
           </div>
