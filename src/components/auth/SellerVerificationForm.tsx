@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,7 +13,7 @@ import {
   FormMessage,
   FormDescription,
 } from '@/components/ui/form';
-import { Calendar } from 'lucide-react';
+import { Calendar, Info, ArrowLeft } from 'lucide-react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -33,7 +33,7 @@ import {
   CardContent
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
 
 // Form schema
 const verificationSchema = z.object({
@@ -51,7 +51,7 @@ const verificationSchema = z.object({
   
   // Document information
   documentType: z.string().min(1, { message: 'Document type is required' }),
-  dtiCertificationNumber: z.string().min(3, { message: 'DTI Certification Number is required' }),
+  dtiCertificationNumber: z.string().min(3, { message: 'Certification number is required' }),
   dtiCertificationExpiry: z.date({
     required_error: "Expiry date is required",
   }),
@@ -76,13 +76,17 @@ type VerificationFormValues = z.infer<typeof verificationSchema>;
 interface SellerVerificationFormProps {
   userId?: string;
   onComplete: () => void;
+  onBack?: () => void;
 }
 
-const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerificationFormProps) => {
+const SellerVerificationForm = ({ userId: propsUserId, onComplete, onBack }: SellerVerificationFormProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [userId, setUserId] = useState<string | null>(propsUserId || null);
+  const [selectedDocumentType, setSelectedDocumentType] = useState('DTI Certificate');
+  const formRef = useRef<HTMLFormElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Get current user from Supabase Auth if userId is not provided
@@ -110,7 +114,53 @@ const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerif
       vatStatus: 'Non-VAT Registered',
       termsAgreed: false,
     },
+    mode: 'onSubmit',
+    criteriaMode: 'all',
   });
+
+  const scrollToError = () => {
+    const errorFields = formRef.current?.querySelectorAll('.form-error');
+    if (errorFields && errorFields.length > 0) {
+      const firstErrorField = errorFields[0];
+      firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const inputElement = firstErrorField.querySelector('input, select, textarea');
+      if (inputElement) {
+        (inputElement as HTMLElement).focus();
+      }
+    }
+  };
+
+  // Get certification field labels and placeholders based on document type
+  const getCertificationLabels = (documentType: string) => {
+    switch(documentType) {
+      case 'SEC Registration':
+        return {
+          numberLabel: 'SEC Registration Number',
+          numberPlaceholder: 'e.g. ASEC-123456',
+          expiryLabel: 'SEC Registration Expiry'
+        };
+      case 'CDA Certificate':
+        return {
+          numberLabel: 'CDA Certificate Number',
+          numberPlaceholder: 'e.g. CDA-2025-12345',
+          expiryLabel: 'CDA Certificate Expiry'
+        };
+      case 'DTI Certificate':
+      default:
+        return {
+          numberLabel: 'DTI Certification Number',
+          numberPlaceholder: 'e.g. DTI-2025-12345',
+          expiryLabel: 'DTI Certification Expiry'
+        };
+    }
+  };
+
+  // Get current labels based on selected document type
+  const certificationLabels = getCertificationLabels(selectedDocumentType);
+
+  const handleBack = () => {
+    navigate('/seller-dashboard');
+  };
 
   const onSubmit = async (data: VerificationFormValues) => {
     setIsUploading(true);
@@ -226,6 +276,17 @@ const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerif
  
   return (
     <div className="space-y-6">
+      <div className="flex justify-start mb-4">
+        <Button 
+          variant="outline" 
+          className="flex items-center gap-2 text-primary hover:bg-primary/5 hover:text-primary-600 transition-all duration-200" 
+          onClick={handleBack}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back</span>
+        </Button>
+      </div>
+
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold">Seller Verification</h2>
         <p className="text-muted-foreground">
@@ -233,24 +294,24 @@ const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerif
         </p>
       </div>
 
-      <Alert variant="default" className="bg-blue-50 border-blue-200 mb-4">
-        <Info className="h-4 w-4" />
-        <AlertDescription>
+      <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800 mb-4">
+        <Info className="h-4 w-4 dark:text-blue-400" />
+        <AlertDescription className="dark:text-blue-300">
           This information will be used to ensure proper compliance to seller onboarding requirements for the marketplace.
           We will not re-use any records or documents for incomplete or incorrect information provided.
         </AlertDescription>
       </Alert>
 
       {uploadError && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
+        <div className="p-3 bg-red-50 border border-red-200 dark:bg-red-950/30 dark:border-red-800 rounded-md text-red-600 dark:text-red-400 text-sm">
           Error: {uploadError}
         </div>
       )}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <form ref={formRef} onSubmit={form.handleSubmit(onSubmit, scrollToError)} className="space-y-8">
           {/* Entity Information Section */}
-          <Card>
+          <Card className="dark:border-gray-800 dark:bg-gray-900/60">
             <CardContent className="pt-6">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold">Entity Information</h3>
@@ -259,28 +320,31 @@ const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerif
               <FormField
                 control={form.control}
                 name="sellerType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Seller Type</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                      disabled={isUploading}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select seller type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Sole Proprietorship">Sole Proprietorship</SelectItem>
-                        <SelectItem value="Corporation/Partnership/Cooperative">Corporation/Partnership/Cooperative</SelectItem>
-                        <SelectItem value="One Person Corporation">One Person Corporation</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field, formState }) => {
+                  const hasError = formState.errors["sellerType"] !== undefined;
+                  return (
+                    <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                      <FormLabel required>Seller Type</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                        disabled={isUploading}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select seller type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Sole Proprietorship">Sole Proprietorship</SelectItem>
+                          <SelectItem value="Corporation/Partnership/Cooperative">Corporation/Partnership/Cooperative</SelectItem>
+                          <SelectItem value="One Person Corporation">One Person Corporation</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               
               <div className="mt-4 mb-2">
@@ -292,86 +356,98 @@ const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerif
                 <FormField
                   control={form.control}
                   name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          disabled={isUploading}
-                          placeholder="First name"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field, formState }) => {
+                    const hasError = formState.errors["firstName"] !== undefined;
+                    return (
+                      <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                        <FormLabel required>First Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            disabled={isUploading}
+                            placeholder="First name"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
                 
                 <FormField
                   control={form.control}
                   name="middleName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Middle Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          disabled={isUploading}
-                          placeholder="Middle name (optional)"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field, formState }) => {
+                    const hasError = formState.errors["middleName"] !== undefined;
+                    return (
+                      <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                        <FormLabel>Middle Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            disabled={isUploading}
+                            placeholder="Middle name (optional)"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
                 
                 <FormField
                   control={form.control}
                   name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          disabled={isUploading}
-                          placeholder="Last name"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field, formState }) => {
+                    const hasError = formState.errors["lastName"] !== undefined;
+                    return (
+                      <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                        <FormLabel required>Last Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            disabled={isUploading}
+                            placeholder="Last name"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
                 
                 <FormField
                   control={form.control}
                   name="suffix"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Suffix</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                        disabled={isUploading}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select suffix (optional)" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="Jr.">Jr.</SelectItem>
-                          <SelectItem value="Sr.">Sr.</SelectItem>
-                          <SelectItem value="I">I</SelectItem>
-                          <SelectItem value="II">II</SelectItem>
-                          <SelectItem value="III">III</SelectItem>
-                          <SelectItem value="IV">IV</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field, formState }) => {
+                    const hasError = formState.errors["suffix"] !== undefined;
+                    return (
+                      <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                        <FormLabel>Suffix</FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          defaultValue={field.value}
+                          disabled={isUploading}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select suffix (optional)" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="Jr.">Jr.</SelectItem>
+                            <SelectItem value="Sr.">Sr.</SelectItem>
+                            <SelectItem value="I">I</SelectItem>
+                            <SelectItem value="II">II</SelectItem>
+                            <SelectItem value="III">III</SelectItem>
+                            <SelectItem value="IV">IV</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
               
@@ -379,23 +455,26 @@ const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerif
                 <FormField
                   control={form.control}
                   name="businessName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Business Name/Trade Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          disabled={isUploading}
-                          placeholder="Enter your business name"
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Please fill in your Business Name/Trade Name.
-                        If Business Name/Trade Name is not applicable, please enter your Taxpayer Name as indicated on your BIR Certificate.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field, formState }) => {
+                    const hasError = formState.errors["businessName"] !== undefined;
+                    return (
+                      <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                        <FormLabel required>Business Name/Trade Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            disabled={isUploading}
+                            placeholder="Enter your business name"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Please fill in your Business Name/Trade Name.
+                          If Business Name/Trade Name is not applicable, please enter your Taxpayer Name as indicated on your BIR Certificate.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
               
@@ -403,23 +482,26 @@ const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerif
                 <FormField
                   control={form.control}
                   name="registeredAddress"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Registered Address</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          disabled={isUploading}
-                          placeholder="Enter your registered business address"
-                          className="resize-none"
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Registered Address as written on your BIR Certificate of Registration
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field, formState }) => {
+                    const hasError = formState.errors["registeredAddress"] !== undefined;
+                    return (
+                      <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                        <FormLabel required>Registered Address</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            disabled={isUploading}
+                            placeholder="Enter your registered business address"
+                            className="resize-none"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Registered Address as written on your BIR Certificate of Registration
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
               
@@ -427,27 +509,30 @@ const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerif
                 <FormField
                   control={form.control}
                   name="zipCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Zip Code</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          disabled={isUploading}
-                          placeholder="Enter zip code"
-                          maxLength={10}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field, formState }) => {
+                    const hasError = formState.errors["zipCode"] !== undefined;
+                    return (
+                      <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                        <FormLabel required>Zip Code</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            disabled={isUploading}
+                            placeholder="Enter zip code"
+                            maxLength={10}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
             </CardContent>
           </Card>
           
           {/* DTI Certificate Section */}
-          <Card>
+          <Card className="dark:border-gray-800 dark:bg-gray-900/60">
             <CardContent className="pt-6">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold">Primary Business Document</h3>
@@ -456,123 +541,138 @@ const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerif
               <FormField
                 control={form.control}
                 name="documentType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Document Type</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                      disabled={isUploading}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select document type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="DTI Certificate">DTI Certificate</SelectItem>
-                        <SelectItem value="SEC Registration">SEC Registration</SelectItem>
-                        <SelectItem value="Mayor's Permit">CDA Certificate</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field, formState }) => {
+                  const hasError = formState.errors["documentType"] !== undefined;
+                  return (
+                    <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                      <FormLabel required>Document Type</FormLabel>
+                      <Select 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          setSelectedDocumentType(value);
+                        }} 
+                        defaultValue={field.value}
+                        disabled={isUploading}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select document type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="DTI Certificate">DTI Certificate</SelectItem>
+                          <SelectItem value="SEC Registration">SEC Registration</SelectItem>
+                          <SelectItem value="CDA Certificate">CDA Certificate</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
     
               <FormField
                 control={form.control}
                 name="dtiCertificationNumber"
-                render={({ field }) => (
-                  <FormItem className="mt-4">
-                    <FormLabel>DTI Certification Number</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        disabled={isUploading}
-                        placeholder="e.g. DTI-2025-12345"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field, formState }) => {
+                  const hasError = formState.errors["dtiCertificationNumber"] !== undefined;
+                  return (
+                    <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                      <FormLabel required>{certificationLabels.numberLabel}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          disabled={isUploading}
+                          placeholder={certificationLabels.numberPlaceholder}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
     
               <FormField
                 control={form.control}
                 name="dtiCertificationExpiry"
-                render={({ field }) => (
-                  <FormItem className="mt-4">
-                    <FormLabel>DTI Certification Expiry</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                            disabled={isUploading}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <Calendar className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) => date < new Date()}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field, formState }) => {
+                  const hasError = formState.errors["dtiCertificationExpiry"] !== undefined;
+                  return (
+                    <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                      <FormLabel required>{certificationLabels.expiryLabel}</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              disabled={isUploading}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <Calendar className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) => date < new Date()}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
     
               <FormField
                 control={form.control}
                 name="documentFile"
-                render={({ field: { value, onChange } }) => (
-                  <FormItem className="mt-4">
-                    <FormLabel>Upload Document</FormLabel>
-                    <FormControl>
-                      <div className="grid w-full items-center gap-1.5">
-                        <Input
-                          id="documentFile"
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          disabled={isUploading}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              onChange(file);
-                            }
-                          }}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormDescription>
-                      Supported formats: PDF (Maximum: 20MB)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field: { value, onChange }, formState }) => {
+                  const hasError = formState.errors["documentFile"] !== undefined;
+                  return (
+                    <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                      <FormLabel required>Upload Document</FormLabel>
+                      <FormControl>
+                        <div className="grid w-full items-center gap-1.5">
+                          <Input
+                            id="documentFile"
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            disabled={isUploading}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                onChange(file);
+                              }
+                            }}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Supported formats: PDF (Maximum: 20MB)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
             </CardContent>
           </Card>
 
           {/* Government ID Section */}
-          <Card>
+          <Card className="dark:border-gray-800 dark:bg-gray-900/60">
             <CardContent className="pt-6">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold">Government ID</h3>
@@ -581,71 +681,77 @@ const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerif
               <FormField
                 control={form.control}
                 name="governmentIdType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Government ID Type</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                      disabled={isUploading}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select ID type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="National ID">National ID</SelectItem>
-                        <SelectItem value="Driver's License">Driver's License</SelectItem>
-                        <SelectItem value="Passport">Passport</SelectItem>
-                        <SelectItem value="SSS ID">SSS ID</SelectItem>
-                        <SelectItem value="PhilHealth ID">PhilHealth ID</SelectItem>
-                        <SelectItem value="Voter's ID">Voter's ID</SelectItem>
-                        <SelectItem value="Postal ID">Postal ID</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Please submit a clear photo of your government-issued ID
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field, formState }) => {
+                  const hasError = formState.errors["governmentIdType"] !== undefined;
+                  return (
+                    <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                      <FormLabel required>Government ID Type</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                        disabled={isUploading}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select ID type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="National ID">National ID</SelectItem>
+                          <SelectItem value="Driver's License">Driver's License</SelectItem>
+                          <SelectItem value="Passport">Passport</SelectItem>
+                          <SelectItem value="SSS ID">SSS ID</SelectItem>
+                          <SelectItem value="PhilHealth ID">PhilHealth ID</SelectItem>
+                          <SelectItem value="Voter's ID">Voter's ID</SelectItem>
+                          <SelectItem value="Postal ID">Postal ID</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Please submit a clear photo of your government-issued ID
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               
               <FormField
                 control={form.control}
                 name="governmentIdFile"
-                render={({ field: { value, onChange } }) => (
-                  <FormItem className="mt-4">
-                    <FormLabel>Upload Government ID (w/ Photo)</FormLabel>
-                    <FormControl>
-                      <div className="grid w-full items-center gap-1.5">
-                        <Input
-                          id="governmentIdFile"
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          disabled={isUploading}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              onChange(file);
-                            }
-                          }}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormDescription>
-                      Supported formats: JPG, PNG, PDF (Maximum: 20MB)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field: { value, onChange }, formState }) => {
+                  const hasError = formState.errors["governmentIdFile"] !== undefined;
+                  return (
+                    <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                      <FormLabel required>Upload Government ID (w/ Photo)</FormLabel>
+                      <FormControl>
+                        <div className="grid w-full items-center gap-1.5">
+                          <Input
+                            id="governmentIdFile"
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            disabled={isUploading}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                onChange(file);
+                              }
+                            }}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Supported formats: JPG, PNG, PDF (Maximum: 20MB)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
             </CardContent>
           </Card>
           
           {/* Tax Information Section */}
-          <Card>
+          <Card className="dark:border-gray-800 dark:bg-gray-900/60">
             <CardContent className="pt-6">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold">Tax Information</h3>
@@ -654,60 +760,66 @@ const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerif
               <FormField
                 control={form.control}
                 name="tinNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Taxpayer Identification Number (TIN)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        disabled={isUploading}
-                        placeholder="e.g. 123-456-789-000"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Format: XXX-XXX-XXX-XXX. TIN can be found on your BIR Form 2303, if you don't have one, e.g. (000-000-000-000)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field, formState }) => {
+                  const hasError = formState.errors["tinNumber"] !== undefined;
+                  return (
+                    <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                      <FormLabel required>Taxpayer Identification Number (TIN)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          disabled={isUploading}
+                          placeholder="e.g. 123-456-789-000"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Format: XXX-XXX-XXX-XXX. TIN can be found on your BIR Form 2303, if you don't have one, e.g. (000-000-000-000)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               
               <FormField
                 control={form.control}
                 name="vatStatus"
-                render={({ field }) => (
-                  <FormItem className="mt-4">
-                    <FormLabel>Value Added Tax Registration Status</FormLabel>
-                    <div className="flex flex-row items-center gap-4">
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="radio"
-                          id="vat-registered"
-                          value="VAT Registered"
-                          checked={field.value === "VAT Registered"}
-                          onChange={() => field.onChange("VAT Registered")}
-                          className="form-radio h-4 w-4 text-primary border-gray-300 focus:ring-primary"
-                          disabled={isUploading}
-                        />
-                        <label htmlFor="vat-registered" className="text-sm">VAT Registered</label>
+                render={({ field, formState }) => {
+                  const hasError = formState.errors["vatStatus"] !== undefined;
+                  return (
+                    <FormItem className={`${hasError ? 'form-error' : ''}`}>
+                      <FormLabel>Value Added Tax Registration Status</FormLabel>
+                      <div className="flex flex-row items-center gap-4">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            id="vat-registered"
+                            value="VAT Registered"
+                            checked={field.value === "VAT Registered"}
+                            onChange={() => field.onChange("VAT Registered")}
+                            className="form-radio h-4 w-4 text-primary border-gray-300 focus:ring-primary"
+                            disabled={isUploading}
+                          />
+                          <label htmlFor="vat-registered" className="text-sm">VAT Registered</label>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            id="non-vat-registered"
+                            value="Non-VAT Registered"
+                            checked={field.value === "Non-VAT Registered"}
+                            onChange={() => field.onChange("Non-VAT Registered")}
+                            className="form-radio h-4 w-4 text-primary border-gray-300 focus:ring-primary"
+                            disabled={isUploading}
+                          />
+                          <label htmlFor="non-vat-registered" className="text-sm">Non-VAT Registered</label>
+                        </div>
                       </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="radio"
-                          id="non-vat-registered"
-                          value="Non-VAT Registered"
-                          checked={field.value === "Non-VAT Registered"}
-                          onChange={() => field.onChange("Non-VAT Registered")}
-                          className="form-radio h-4 w-4 text-primary border-gray-300 focus:ring-primary"
-                          disabled={isUploading}
-                        />
-                        <label htmlFor="non-vat-registered" className="text-sm">Non-VAT Registered</label>
-                      </div>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
             </CardContent>
           </Card>
@@ -716,30 +828,33 @@ const SellerVerificationForm = ({ userId: propsUserId, onComplete }: SellerVerif
           <FormField
             control={form.control}
             name="termsAgreed"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                <FormControl>
-                  <input
-                    type="checkbox"
-                    checked={field.value}
-                    onChange={field.onChange}
-                    className="form-checkbox h-4 w-4 mt-1 text-primary border-gray-300 focus:ring-primary"
-                    disabled={isUploading}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>Terms and Conditions</FormLabel>
-                  <FormDescription>
-                    I agree to the <a href="#" className="text-primary underline">Terms and Conditions</a> and <a href="#" className="text-primary underline">Data Privacy Policy</a>
-                  </FormDescription>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
+            render={({ field, formState }) => {
+              const hasError = formState.errors["termsAgreed"] !== undefined;
+              return (
+                <FormItem className={`flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 dark:border-gray-700 dark:bg-gray-800/50 ${hasError ? 'form-error' : ''}`}>
+                  <FormControl>
+                    <input
+                      type="checkbox"
+                      checked={field.value}
+                      onChange={field.onChange}
+                      className="form-checkbox h-4 w-4 mt-1 text-primary border-gray-300 dark:border-gray-700 focus:ring-primary dark:bg-gray-700 dark:checked:bg-primary"
+                      disabled={isUploading}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel required>Terms and Conditions</FormLabel>
+                    <FormDescription>
+                      I agree to the <a href="#" className="text-primary underline dark:text-primary-400">Terms and Conditions</a> and <a href="#" className="text-primary underline dark:text-primary-400">Data Privacy Policy</a>
+                    </FormDescription>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
           />
 
           {isUploading && uploadProgress > 0 && (
-            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4">
               <div 
                 className="bg-primary h-2.5 rounded-full transition-all duration-300" 
                 style={{ width: `${uploadProgress}%` }}

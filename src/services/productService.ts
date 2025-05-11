@@ -54,6 +54,19 @@ export type ProductDetail = {
   } | null;
 };
 
+// Review type definition
+export type ProductReview = {
+  id: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+  user: {
+    id: string;
+    name: string;
+    avatar_url?: string | null;
+  };
+};
+
 // New function to get product details by ID
 export async function getProductById(id: string): Promise<ProductDetail | null> {
   try {
@@ -164,6 +177,55 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
     console.error('Error fetching product details:', error);
     toast.error('Failed to load product details');
     return null;
+  }
+}
+
+// Function to get reviews for a specific product
+export async function getProductReviews(productId: string): Promise<ProductReview[]> {
+  try {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select(`
+        id,
+        rating,
+        comment,
+        created_at,
+        buyer:buyer_id(
+          id,
+          full_name,
+          avatar_url,
+          username
+        )
+      `)
+      .eq('product_id', productId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).map(review => {
+      // Handle avatar URL - if it starts with 'avatars/', get the public URL
+      let avatarUrl = review.buyer?.avatar_url;
+      if (avatarUrl && avatarUrl.startsWith('avatars/')) {
+        const { data } = supabase.storage.from('profiles').getPublicUrl(avatarUrl);
+        avatarUrl = data.publicUrl;
+      }
+
+      return {
+        id: review.id,
+        rating: review.rating,
+        comment: review.comment,
+        created_at: review.created_at,
+        user: {
+          id: review.buyer?.id || '',
+          name: review.buyer?.full_name || review.buyer?.username || 'Anonymous User',
+          avatar_url: avatarUrl
+        }
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching product reviews:', error);
+    toast.error('Failed to load product reviews');
+    return [];
   }
 }
 

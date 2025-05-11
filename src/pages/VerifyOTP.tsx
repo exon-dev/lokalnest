@@ -195,9 +195,9 @@ const VerifyOTP = () => {
                   name="otp"
                   render={({ field }) => (
                     <FormItem className="space-y-2">
-                      <FormControl>
+                      <FormControl className="flex justify-center">
                         <InputOTP maxLength={6} {...field}>
-                          <InputOTPGroup>
+                          <InputOTPGroup className="justify-center mx-auto">
                             <InputOTPSlot index={0} className="rounded-md" />
                             <InputOTPSlot index={1} className="rounded-md" />
                             <InputOTPSlot index={2} className="rounded-md" />

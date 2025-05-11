@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Star, AlertCircle, Package, Truck, Calendar, MapPin, Phone } from 'lucide-react';
+import { Star, AlertCircle, Package, Truck, Calendar, MapPin, Phone, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { submitReview } from '@/services/reviewService';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,8 +50,9 @@ const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
         (e.target as HTMLElement).closest('[data-cancel-button]')) {
       return;
     }
-    // Add debug logging to see the address data when opening the modal
+    // Add debug logging to see the order data when opening the modal
     console.log('Order details opened with data:', order);
+    console.log('Payment Method:', order.paymentMethod);
     console.log('Address data:', order.addresses);
     console.log('Phone data:', order.phone);
     setIsOrderDetailsOpen(true);
@@ -127,8 +128,8 @@ const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
   };
 
   const handleCancelOrder = async () => {
-    if (order.status !== 'processing') {
-      toast.error('Only orders in processing status can be cancelled');
+    if (order.status.toLowerCase() !== 'pending') {
+      toast.error('Only orders in pending status can be cancelled');
       return;
     }
     
@@ -164,8 +165,8 @@ const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
     }
   };
 
-  const isDelivered = order.status === 'delivered';
-  const canBeCancelled = order.status === 'processing';
+  const isDelivered = order.status.toLowerCase() === 'delivered';
+  const canBeCancelled = order.status.toLowerCase() === 'pending';
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -350,57 +351,75 @@ const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
                     <OrderStatusIcon status={order.status} />
                     <span className="font-medium">{order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span>
                   </div>
-                  
-                  {order.tracking && (
-                    <>
-                      <div className="flex items-start space-x-2">
-                        <Truck className="h-4 w-4 text-muted-foreground mt-1" />
-                        <div>
-                          <p className="font-medium">Tracking Number</p>
-                          <p className="text-sm text-muted-foreground">{order.tracking.id}</p>
-                          <p className="text-sm text-muted-foreground">{order.tracking.courier}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-start space-x-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground mt-1" />
-                        <div>
-                          <p className="font-medium">Estimated Delivery</p>
-                          <p className="text-sm text-muted-foreground">
-                            {new Date(order.tracking.estimatedDelivery).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  )}
                 </div>
-                
-                {order.tracking && order.tracking.updates && order.tracking.updates.length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium mb-2">Recent Updates</h4>
-                    <div className="border rounded-md p-4 space-y-3">
-                      {order.tracking.updates.slice(0, 2).map((update, idx) => (
-                        <div key={idx} className="text-sm">
-                          <p className="font-medium">{update.status}</p>
-                          <p className="text-muted-foreground">{update.location} • {update.timestamp}</p>
-                        </div>
-                      ))}
-                      
-                      {order.tracking.updates.length > 2 && (
-                        <Button variant="link" size="sm" className="p-0 h-auto" asChild>
-                          <a href="#" onClick={(e) => {
-                            e.preventDefault();
-                            setIsOrderDetailsOpen(false);
-                          }}>
-                            View all updates
-                          </a>
-                        </Button>
-                      )}
+
+                {/* Separate Payment Method section */}
+                <h3 className="text-lg font-medium mb-2 mt-4">Payment Method</h3>
+                <div className="border rounded-md p-4 space-y-2">                  
+                  <div className="flex items-start space-x-2">
+                    <CreditCard className="h-4 w-4 text-muted-foreground mt-1" />
+                    <div>
+                      <p className="font-medium">Payment Method</p>
+                      <p className="text-sm text-muted-foreground">
+                        {order.paymentMethod ? (order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod) : "Not specified"}
+                      </p>
                     </div>
                   </div>
+                </div>
+                
+                {order.tracking && (
+                  <>
+                  {/* Tracking Information section */}
+                  <h3 className="text-lg font-medium mb-2 mt-4">Tracking Information</h3>
+                  <div className="border rounded-md p-4 space-y-2">
+                    <div className="flex items-start space-x-2">
+                      <Truck className="h-4 w-4 text-muted-foreground mt-1" />
+                      <div>
+                        <p className="font-medium">Tracking Number</p>
+                        <p className="text-sm text-muted-foreground">{order.tracking.id}</p>
+                        <p className="text-sm text-muted-foreground">{order.tracking.courier}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start space-x-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground mt-1" />
+                      <div>
+                        <p className="font-medium">Estimated Delivery</p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(order.tracking.estimatedDelivery).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  </>
                 )}
               </div>
             </div>
+            
+            {order.tracking && order.tracking.updates && order.tracking.updates.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-medium mb-2">Recent Updates</h4>
+                <div className="border rounded-md p-4 space-y-3">
+                  {order.tracking.updates.slice(0, 2).map((update, idx) => (
+                    <div key={idx} className="text-sm">
+                      <p className="font-medium">{update.status}</p>
+                      <p className="text-muted-foreground">{update.location} • {update.timestamp}</p>
+                    </div>
+                  ))}
+                  
+                  {order.tracking.updates.length > 2 && (
+                    <Button variant="link" size="sm" className="p-0 h-auto" asChild>
+                      <a href="#" onClick={(e) => {
+                        e.preventDefault();
+                        setIsOrderDetailsOpen(false);
+                      }}>
+                        View all updates
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
             
             <DialogFooter className="gap-2 sm:gap-0">
               {canBeCancelled && (

@@ -39,6 +39,7 @@ export interface Order {
   tracking?: OrderTracking;
   addresses: Address;  // Changed from address to addresses
   phone: string;
+  paymentMethod?: string; // Added payment_method field
 }
 
 // Modified to accept string status that will be cast to the required type

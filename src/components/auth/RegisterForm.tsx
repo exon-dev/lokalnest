@@ -264,16 +264,24 @@ const RegisterForm = ({ isLoading, setIsLoading, showPassword, togglePasswordVis
               <div className="grid grid-cols-2 gap-4">
                 <Button
                   type="button"
-                  variant={field.value === 'buyer' ? 'default' : 'outline'}
-                  className="w-full justify-center"
+                  variant="outline"
+                  className={`w-full justify-center ${
+                    field.value === 'buyer' 
+                      ? 'ring-2 ring-primary ring-offset-2' 
+                      : ''
+                  }`}
                   onClick={() => field.onChange('buyer')}
                 >
                   Buyer
                 </Button>
                 <Button
                   type="button"
-                  variant={field.value === 'seller' ? 'default' : 'outline'}
-                  className="w-full justify-center"
+                  variant="outline"
+                  className={`w-full justify-center ${
+                    field.value === 'seller' 
+                      ? 'ring-2 ring-primary ring-offset-2' 
+                      : ''
+                  }`}
                   onClick={() => field.onChange('seller')}
                 >
                   Seller
